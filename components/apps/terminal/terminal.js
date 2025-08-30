@@ -42,6 +42,34 @@ export class Terminal extends Component {
             'lscpu', 'lsusb', 'lspci', 'mount', 'umount', 'fdisk', 'lsblk', 'systemctl'
         ];
 
+        // Cloud storage integration from Korg Shell
+        this.cloud_services = {
+            'github': 'GitHub repositories',
+            'gitlab': 'GitLab projects', 
+            'huggingface': 'HuggingFace models',
+            'mediafire': 'MediaFire storage'
+        };
+
+        // Smart package knowledge base from TermiMation.py
+        this.package_knowledge = {
+            'pip': 'python3-pip',
+            'pip3': 'python3-pip',
+            'gcc': 'gcc',
+            'g++': 'g++',
+            'make': 'make',
+            'cmake': 'cmake',
+            'curl': 'curl',
+            'wget': 'wget',
+            'git': 'git',
+            'vim': 'vim',
+            'nano': 'nano',
+            'sudo': 'sudo'
+        };
+
+        // Error patterns and auto-fix capabilities from TermiMation.py
+        this.error_patterns = new Map();
+        this.auto_fix_history = [];
+
         // Programming language detectors and runners
         this.language_runners = {
             '.js': 'node',
@@ -208,6 +236,8 @@ export class Terminal extends Component {
             'grep', 'find', 'chmod', 'chown', 'tar', 'zip', 'unzip', 'git', 'npm', 
             'pip', 'docker', 'kubectl', 'clear', 'exit', 'help', 'man', 'which',
             'shell-type', 'lang-detect', 'run-code', 'network-scan', 'sys-info',
+            'github', 'gitlab', 'huggingface', 'mediafire', 'venice', '@venice',
+            'smart-install', 'auto-fix', 'monitor-commands', 'history',
             ...this.network_tools, ...this.system_tools
         ];
 
@@ -451,6 +481,31 @@ export class Terminal extends Component {
                 result = this.getCommandHistory();
                 break;
 
+            // Cloud storage integration (from Korg Shell)
+            case "github":
+            case "gitlab":
+            case "huggingface":
+            case "mediafire":
+                result = this.handleCloudStorage(main, words);
+                break;
+            
+            // AI integration and Venice commands (from Korg Shell)
+            case "venice":
+            case "@venice":
+                result = this.handleVeniceAI(words);
+                break;
+            
+            // Smart installation from TermiMation.py
+            case "smart-install":
+                result = this.handleSmartInstall(words);
+                break;
+            case "auto-fix":
+                result = this.handleAutoFix(words);
+                break;
+            case "monitor-commands":
+                result = this.handleCommandMonitoring(words);
+                break;
+
             // Special commands
             case "sudo":
                 ReactGA.event({
@@ -615,28 +670,127 @@ Swap:             0           0           0
         return `${cmd} ${args}: System command simulated\n[Limited system access on Android 10]`;
     }
 
+    }
+
+    // Cloud storage integration from Korg Shell
+    handleCloudStorage = (service, args) => {
+        const operations = {
+            'github': () => {
+                if (args[0] === 'clone') {
+                    return `Simulating: git clone ${args[1]}\n[GitHub integration - requires authentication]`;
+                } else if (args[0] === 'list') {
+                    return `Listing GitHub repositories...\n[Connect via: git remote add origin <url>]`;
+                }
+                return `GitHub service: Available operations: clone, list, push, pull`;
+            },
+            'gitlab': () => {
+                return `GitLab integration: ${args.join(' ')}\n[Sync with GitLab projects]`;
+            },
+            'huggingface': () => {
+                if (args[0] === 'download') {
+                    return `Downloading HuggingFace model: ${args[1]}\n[Model integration for AI features]`;
+                }
+                return `HuggingFace service: Available operations: download, list, info`;
+            },
+            'mediafire': () => {
+                return `MediaFire storage: ${args.join(' ')}\n[File upload/download simulation]`;
+            }
+        };
+        
+        return operations[service] ? operations[service]() : `${service}: Cloud service not recognized`;
+    }
+
+    // Venice AI integration from Korg Shell
+    handleVeniceAI = (args) => {
+        const command = args.join(' ');
+        
+        if (command.startsWith('##Persona')) {
+            return `Venice AI: Switching to persona ${command}\n[AI persona switching simulated]`;
+        } else if (command.startsWith('##System')) {
+            return `Venice AI: Applying system prompt\n[System prompt configuration simulated]`;
+        } else if (command.startsWith('##Guidelines')) {
+            return `Venice AI: Applying operational guidelines\n[AI guidelines application simulated]`;
+        } else {
+            return `Venice AI: ${command}\n[AI interaction simulated - Connect Venice for full functionality]`;
+        }
+    }
+
+    // Smart installation system from TermiMation.py
+    handleSmartInstall = (args) => {
+        const package_name = args[0];
+        if (!package_name) {
+            return "Usage: smart-install <package-name>";
+        }
+
+        const known_package = this.package_knowledge[package_name];
+        if (known_package) {
+            return `Smart Install: Would install ${known_package} for ${package_name}\n[Package resolution: ${package_name} -> ${known_package}]\n[Simulation - requires root access on real Android]`;
+        } else {
+            // Simulate package resolution
+            return `Smart Install: Resolving ${package_name}...\n[Attempting to auto-detect correct package]\n[Simulation - package manager learning disabled on Android 10]`;
+        }
+    }
+
+    // Auto-fix system from TermiMation.py  
+    handleAutoFix = (args) => {
+        const issue_type = args[0] || 'permissions';
+        
+        const fixes = {
+            'permissions': 'Scanning for permission issues...\n[Auto-fixed 3 executable permissions]\n[Learning pattern: script files -> chmod +x]',
+            'packages': 'Checking package dependencies...\n[Resolved 2 missing packages automatically]\n[dpkg status: healthy]',
+            'commands': 'Monitoring command execution...\n[Command not found handler: active]\n[Smart install agent: monitoring]'
+        };
+        
+        return fixes[issue_type] || `Auto-fix system: Monitoring ${issue_type}\n[Real-time error pattern learning active]`;
+    }
+
+    // Command monitoring from TermiMation.py
+    handleCommandMonitoring = (args) => {
+        const action = args[0] || 'status';
+        
+        if (action === 'start') {
+            return `Command Monitor: Starting background monitoring\n[Watching for: command not found, permission errors, package issues]\n[Monitoring active - auto-fixes enabled]`;
+        } else if (action === 'stop') {
+            return `Command Monitor: Stopping background monitoring\n[Auto-fix system disabled]`;
+        } else if (action === 'history') {
+            return `Auto-fix History:\n${this.auto_fix_history.slice(-5).map(fix => `- ${fix}`).join('\n') || 'No auto-fixes recorded'}\n[Last 5 automatic fixes shown]`;
+        } else {
+            return `Command Monitor: Status active\n[Error patterns learned: ${this.error_patterns.size}]\n[Auto-fixes applied: ${this.auto_fix_history.length}]`;
+        }
+    }
+
     getHelpText = () => {
-        return `UBULITE Enhanced Terminal v2.0 - Help
+        return `UBULITE Enhanced Terminal v2.0 - Complete Consolidation - Help
         
 <div class="text-ubt-green font-bold">File System:</div>
-cd, ls, pwd, mkdir, echo, cat, find, grep
+cd, ls, pwd, mkdir, echo, cat, find, grep, chmod, mv, cp, rm
 
 <div class="text-ubt-green font-bold">Network Tools:</div>
-ping, curl, wget, nmap, netstat, network-scan
+ping, curl, wget, nmap, netstat, network-scan, ssh, scp, traceroute
 
 <div class="text-ubt-green font-bold">System Info:</div>
-sys-info, ps, df, free, top, uname
+sys-info, ps, df, free, top, uname, uptime, htop, kill
 
 <div class="text-ubt-green font-bold">Development:</div>
-git, gh, npm, pip, apt, lang-detect, run-code
+git, gh, npm, pip, apt, lang-detect, run-code, smart-install
+
+<div class="text-ubt-green font-bold">Cloud Storage (Korg Shell):</div>
+github [clone|list], gitlab, huggingface [download], mediafire
+
+<div class="text-ubt-green font-bold">AI Integration (Venice):</div>
+venice, @venice [##Persona|##System|##Guidelines]
+
+<div class="text-ubt-green font-bold">Auto-Fix System (TermiMation):</div>
+auto-fix [permissions|packages|commands], monitor-commands, smart-install
 
 <div class="text-ubt-green font-bold">Shell:</div>
 shell-type [bash|zsh], history, clear, exit, help
 
 <div class="text-ubt-green font-bold">Applications:</div>
-code, chrome, spotify, settings, trash
+code, chrome, spotify, settings, trash, terminal
 
-<div class="text-ubt-blue">Optimized for Android 10 • Free APIs Only • Multi-language Support</div>`;
+<div class="text-ubt-blue">✨ Consolidated from 10+ files • Android 10 Optimized • Free APIs Only ✨</div>
+<div class="text-yellow-400">All terminal files from folder now integrated into single component</div>`;
     }
 
     getCommandHistory = () => {
@@ -647,7 +801,7 @@ code, chrome, spotify, settings, trash
     }
 
     getAvailableCommands = () => {
-        return "Available commands: [ cd, ls, pwd, echo, clear, exit, mkdir, code, spotify, chrome, help, git, network-scan, sys-info, shell-type, lang-detect ]";
+        return "Available commands: [ cd, ls, pwd, echo, clear, exit, mkdir, code, spotify, chrome, help, git, network-scan, sys-info, shell-type, lang-detect, github, gitlab, huggingface, venice, smart-install, auto-fix, monitor-commands ]";
     }
 
     xss(str) {
@@ -676,7 +830,7 @@ code, chrome, spotify, settings, trash
         return (
             <div className="h-full w-full bg-ub-drk-abrgn text-white text-sm font-bold" id="terminal-body">
                 <div className="text-xs text-gray-400 p-2 border-b border-gray-600">
-                    UBULITE Enhanced Terminal v2.0 - {this.shell_type.toUpperCase()} - Type 'help' for commands
+                    UBULITE Complete Terminal v2.1 - {this.shell_type.toUpperCase()} - All Files Consolidated - Type 'help' for commands
                 </div>
                 {this.state.terminal}
             </div>
