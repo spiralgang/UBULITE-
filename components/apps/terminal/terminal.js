@@ -53,17 +53,7 @@ export class Terminal extends Component {
         // Smart package knowledge base from TermiMation.py
         this.package_knowledge = {
             'pip': 'python3-pip',
-            'pip3': 'python3-pip',
-            'gcc': 'gcc',
-            'g++': 'g++',
-            'make': 'make',
-            'cmake': 'cmake',
-            'curl': 'curl',
-            'wget': 'wget',
-            'git': 'git',
-            'vim': 'vim',
-            'nano': 'nano',
-            'sudo': 'sudo'
+            'pip3': 'python3-pip'
         };
 
         // Error patterns and auto-fix capabilities from TermiMation.py
