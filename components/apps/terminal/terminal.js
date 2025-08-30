@@ -572,16 +572,16 @@ export class Terminal extends Component {
 
     simulateNetworkCommand = (cmd, args) => {
         const responses = {
-            'ping': `PING ${args || 'localhost'} (127.0.0.1) 56(84) bytes of data.\n64 bytes from localhost: icmp_seq=1 ttl=64 time=0.045 ms\n[Simulation - Android network restricted]`,
+            'ping': `PING ${args || 'localhost'} (192.0.2.1) 56(84) bytes of data.\n64 bytes from localhost: icmp_seq=1 ttl=64 time=0.045 ms\n[Simulation - Android network restricted]`,
             'curl': `HTTP/1.1 200 OK\nContent-Type: text/html\n[Simulation - Would fetch ${args || 'URL'}]`,
-            'wget': `Resolving ${args || 'example.com'}... 93.184.216.34\nConnecting to ${args}... connected.\n[Simulation - Would download file]`,
+            'wget': `Resolving ${args || 'example.com'}... 198.51.100.1\nConnecting to ${args}... connected.\n[Simulation - Would download file]`,
             'nmap': `Starting Nmap scan...\nHost is up (0.00050s latency).\n[Simulation - Network scanning restricted on mobile]`
         };
         return responses[cmd] || `${cmd}: command simulated`;
     }
 
     getNetworkStatus = () => {
-        return `Active Internet connections:\nProto Recv-Q Send-Q  Local Address          Foreign Address        State\ntcp        0      0  127.0.0.1:631          0.0.0.0:*               LISTEN\n[Limited network access on Android]`;
+        return `Active Internet connections:\nProto Recv-Q Send-Q  Local Address          Foreign Address        State\ntcp        0      0  192.0.2.1:631          198.51.100.1:*               LISTEN\n[Limited network access on Android]`;
     }
 
     performNetworkScan = () => {
