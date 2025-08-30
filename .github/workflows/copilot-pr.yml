@@ -1,5 +1,4 @@
 name: Copilot ID
-
 on:
   workflow_dispatch:
   push:
