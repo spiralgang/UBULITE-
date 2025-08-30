@@ -1,6 +1,6 @@
 import displaySpotify from './components/apps/spotify';
 import displayVsCode from './components/apps/vscode';
-import { displayTerminal } from './components/apps/terminal';
+import { displayTerminal } from './components/apps/terminal/terminal';
 import { displaySettings } from './components/apps/settings';
 import { displayChrome } from './components/apps/chrome';
 import { displayTrash } from './components/apps/trash';
