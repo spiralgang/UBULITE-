@@ -29,7 +29,7 @@ jobs:
 
       - name: Ensure gemini PRs
         env:
-          GH_TOKEN: ${{ secrets.neuronlabs }}   # secret: neuronlabs
+          GH_TOKEN: ${{ secrets.GEMINI }}   # secret: GEMINI
           BRANCH_NAME: ${{ github.ref_name }}   # branch: main
           BASE_BRANCH: main
         run: |
@@ -53,8 +53,8 @@ jobs:
             echo "🚀 Creating PR: $BRANCH_NAME → $BASE_BRANCH"
             gh pr create \
               --repo spiralgang/UBULITE \
-              --title "Automated Copilot Fix: $BRANCH_NAME → $BASE_BRANCH" \
-              --body "Automated PR created by Copilot. See workflow logs for details." \
+              --title "Automated Gemini Fix: $BRANCH_NAME → $BASE_BRANCH" \
+              --body "Automated PR created by Gemini. See workflow logs for details." \
               --base "$BASE_BRANCH" \
               --head "$BRANCH_NAME"
           fi
