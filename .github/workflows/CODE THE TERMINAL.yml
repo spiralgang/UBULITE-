@@ -1,4 +1,4 @@
-name: Copilot ID
+name: Gemini
 
 on:
   push:
@@ -27,21 +27,21 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Ensure idempotent Copilot PRs
+      - name: Ensure gemini PRs
         env:
           GH_TOKEN: ${{ secrets.neuronlabs }}   # secret: neuronlabs
           BRANCH_NAME: ${{ github.ref_name }}   # branch: main
           BASE_BRANCH: main
         run: |
           set -euo pipefail
-          echo "🔒 Running Copilot dedupe on ${BRANCH_NAME} → ${BASE_BRANCH}"
+          echo "🔒 Running Gemini dedupe on ${BRANCH_NAME} → ${BASE_BRANCH}"
           EXISTING_PR=$(gh pr list \
             --repo spiralgang/UBULITE \
             --state open \
             --head "$BRANCH_NAME" \
             --base "$BASE_BRANCH" \
             --json number \
-            --jq '.[20].number' || echo "")
+            --jq '.[0].number' || echo "")
 
           if [[ -n "$EXISTING_PR" ]]; then
             echo "🔄 PR #$EXISTING_PR exists. Pushing updates..."
