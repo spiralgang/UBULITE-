@@ -1,26 +1,80 @@
-# AI Review Manager Workflow Configuration
-# Note: This workflow was using a non-existent action 'ai-review-manager@v4'
-# Since this action doesn't exist on GitHub Actions marketplace, this workflow
-# has been disabled. If you want to implement AI reviews, consider using:
-# - GitHub's built-in code review features
-# - Third-party review tools like CodeClimate, SonarCloud
-# - Custom scripts with AI APIs
+name: Code-Reaver Pull Request Scrutiny
 
-# Uncomment and modify below if you implement a working AI review system:
-#
-# name: AI Review Manager
-#
-# on:
-#   push:
-#     branches:
-#       - main
-#
-# jobs:
-#   review:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
-#
-#       - name: Placeholder for AI Review
-#         run: echo "AI review functionality not implemented yet"
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  analyze_pull_requests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout the damn code
+      uses: actions/checkout@v3
+
+    - name: Set up Python, because we need a sharp blade
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies, the lifeblood of our operation
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests PyGithub
+
+    - name: Execute the GitHub API Harvest, let the data bleed!
+      env:
+        GITHUB_TOKEN: ${{ secrets.GEMINI }} # Proper secret reference
+        REPO_OWNER: spiralgang             # Explicitly set as environment variable
+        REPO_NAME: UBULITE                 # Explicitly set as environment variable
+      run: |
+        python - <<EOF
+        import os
+        import requests
+        from github import Github
+
+        GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
+        REPO_OWNER = os.environ.get('REPO_OWNER')
+        REPO_NAME = os.environ.get('REPO_NAME')
+
+        if not GITHUB_TOKEN:
+            print("ERROR: GITHUB_TOKEN not found.")
+            exit(1)
+
+        g = Github(GITHUB_TOKEN)
+        try:
+            repo = g.get_user(REPO_OWNER).get_repo(REPO_NAME)
+        except Exception as e:
+            print(f"ERROR: Can't find the repo! {e}")
+            exit(1)
+
+        print(f"Commencing full-spectrum analysis of pull requests for {REPO_OWNER}/{REPO_NAME}...")
+
+        pulls = repo.get_pulls(state='all', sort='created', direction='desc')
+        
+        pr_data = []
+        for pr in pulls:
+            if pr.merged:
+                created_at_timestamp = pr.created_at.timestamp()
+                merged_at_timestamp = pr.merged_at.timestamp()
+                time_to_merge_seconds = merged_at_timestamp - created_at_timestamp
+                time_to_merge_hours = round(time_to_merge_seconds / 3600, 2)
+
+                print(f"PR #{pr.number}: '{pr.title}' by {pr.user.login} was merged in {time_to_merge_hours} hours. (ID: {pr.id})")
+                pr_data.append({
+                    'id': pr.id,
+                    'title': pr.title,
+                    'user': pr.user.login,
+                    'state': pr.state,
+                    'created_at': pr.created_at.isoformat(),
+                    'merged_at': pr.merged_at.isoformat(),
+                    'time_to_merge_hours': time_to_merge_hours
+                })
+            else:
+                print(f"PR #{pr.number}: '{pr.title}' by {pr.user.login} is still {pr.state}. (ID: {pr.id})")
+        
+        print("\n--- Summary of Pain Points ---")
+        if pr_data:
+            # Additional analysis can go here
+        EOF
