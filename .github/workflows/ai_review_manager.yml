@@ -1,20 +1,26 @@
 # AI Review Manager Workflow Configuration
-name: AI Review Manager
+# Note: This workflow was using a non-existent action 'ai-review-manager@v4'
+# Since this action doesn't exist on GitHub Actions marketplace, this workflow
+# has been disabled. If you want to implement AI reviews, consider using:
+# - GitHub's built-in code review features
+# - Third-party review tools like CodeClimate, SonarCloud
+# - Custom scripts with AI APIs
 
-on:
-  push:
-    branches:
-      - main
-
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run AI Review
-        uses: ai-review-manager@v4
-        with:
-          reviewers: 'Gemini, Claude, Deepseek-Coder, BigModel.cn 3.5/4.0'
-          standards: 'vault'
+# Uncomment and modify below if you implement a working AI review system:
+#
+# name: AI Review Manager
+#
+# on:
+#   push:
+#     branches:
+#       - main
+#
+# jobs:
+#   review:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+#
+#       - name: Placeholder for AI Review
+#         run: echo "AI review functionality not implemented yet"

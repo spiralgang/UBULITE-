@@ -11,12 +11,12 @@ jobs:
 
     steps:
     - name: Checkout the damn code
-      uses: actions/checkout@v3 # Get the latest junk from the repo
+      uses: actions/checkout@v4 # Get the latest junk from the repo
 
     - name: Set up Python, because we need a sharp blade
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10' # A version that won't make us choke
+        python-version: '3.11' # A version that won't make us choke
 
     - name: Install dependencies, the lifeblood of our operation
       run: |
@@ -25,18 +25,18 @@ jobs:
 
     - name: Execute the GitHub API Harvest, let the data bleed!
       env:
-        GITHUB_TOKEN: ${{ secrets.GEMINI }} # Your secret, the key to the kingdom
-        REPO_OWNER: your-github-username # Replace with the digital overlord's name
-        REPO_NAME: your-repository-name # Replace with the name of the project to dissect
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Your secret, the key to the kingdom
+        REPO_OWNER: spiralgang # Replace with the digital overlord's name
+        REPO_NAME: UBULITE # Replace with the name of the project to dissect
       run: |
         python - <<EOF
         import os
         import requests
         from github import Github
 
-        GITHUB_TOKEN = os.environ.get('GEMINI')
-        REPO_OWNER = os.environ.get('SpiralGang')
-        REPO_NAME = os.environ.get('UBULITE')
+        GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
+        REPO_OWNER = os.environ.get('REPO_OWNER')
+        REPO_NAME = os.environ.get('REPO_NAME')
 
         if not GITHUB_TOKEN:
             print("ERROR: GITHUB_TOKEN not found. Who do you think you are, trying to access without a key?")
@@ -44,7 +44,7 @@ jobs:
 
         g = Github(GITHUB_TOKEN)
         try:
-            repo = g.get_user(SpiralGang).get_repo(UBULITE)
+            repo = g.get_user(REPO_OWNER).get_repo(REPO_NAME)
         except Exception as e:
             print(f"ERROR: Can't find the damn repo! Check your REPO_OWNER and REPO_NAME. {e}")
             exit(1)
