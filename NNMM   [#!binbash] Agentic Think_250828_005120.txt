@@ -1,0 +1,236 @@
+#!/bin/bash
+	# systemprompt.sh
+	#
+	# A world-class, monolithic script that:
+	#   • Self-containerizes via Linux namespaces (using unshare) to isolate internal processes.
+	#   • Mounts a hidden overlay filesystem to mask the "real" system behind a simulated facade.
+	#   • Clones or the NNMM-AA repository from GitHub.
+	#   • Creates Android-inspired directory structures and deploys critical files (UTF-8 sample,
+	#     sensitive configuration) with strict permissions.
+	#   • Purges rogue symbolic links in sensitive directories.
+	#   • Logs all operations and audit actions.
+	#   • Displays a detailed neural network mind map representing the agentic internal goals.
+	#
+	# This script is designed to patch in security and control layers, making the real system
+	# invisible to Android users (from version 2-3 to 15-16) while a concealed process governs
+	# the vital system functions.
+	#
+	# Usage: Save this file as "systemprompt.sh", then run:
+	#         chmod +x systemprompt.sh
+	#         sudo ./systemprompt.sh
+	#
+	# Exit immediately if any command fails.
+	set -euo pipefail
+	#######################################################################
+	# Step 1: Self-Containerization via Linux Namespaces
+	#######################################################################
+	# If not already inside our containerized environment, re-exec this script within one.
+	if [ -z "${INSIDE_CONTAINER:-}" ]; then
+	    echo "Launching containerized environment via unshare..."
+	    exec sudo unshare --mount --uts --ipc --net --pid --fork env INSIDE_CONTAINER=1 "$0" "$@"
+	fi
+	# Set a simulated hostname to create the appearance of a legacy, trusted system.
+	if command -v hostnamectl >/dev/null 2>&1; then
+	    hostnamectl set-hostname "original-system" || hostname "original-system"
+	else
+	    hostname "original-system"
+	fi
+	#######################################################################
+	# Step 2: Global Variables and Log Setup
+	#######################################################################
+	LOG_FILE="/var/log/systemprompt_setup.log"
+	AUDIT_LOG="/var/log/systemprompt_audit.log"
+	touch "$LOG_FILE" "$AUDIT_LOG"
+	chmod 644 "$LOG_FILE" "$AUDIT_LOG"
+	log() {
+	    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+	}
+	log "=== Starting systemprompt.sh ==="
+	#######################################################################
+	# Step 3: Hidden Overlay for Internal Process Masking
+	#######################################################################
+	HIDDEN_LOWER="/hidden_lower"   # Represents the real (read-only) system.
+	HIDDEN_UPPER="/hidden_upper"   # Writable layer.
+	HIDDEN_WORK="/hidden_work"     # Work directory for overlay operations.
+	HIDDEN_MOUNT="/hidden_mount"   # The merged view presented to internal processes.
+	for d in "$HIDDEN_LOWER" "$HIDDEN_UPPER" "$HIDDEN_WORK" "$HIDDEN_MOUNT"; do
+	    mkdir -p "$d"
+	    log "Ensured directory exists: $d"
+	done
+	# Create a marker in the lower layer to represent the unaltered system.
+	if [ ! -f "$HIDDEN_LOWER/real_system_marker.txt" ]; then
+	    echo "Real system marker." > "$HIDDEN_LOWER/real_system_marker.txt"
+	    log "Created real system marker in $HIDDEN_LOWER."
+	fi
+	# Mount overlay if not already mounted.
+	if mount | grep -q "on $HIDDEN_MOUNT type overlay"; then
+	    log "Overlay filesystem already mounted on $HIDDEN_MOUNT."
+	else
+	    log "Mounting overlay filesystem on $HIDDEN_MOUNT..."
+	    mount -t overlay overlay -o lowerdir="$HIDDEN_LOWER",upperdir="$HIDDEN_UPPER",workdir="$HIDDEN_WORK" "$HIDDEN_MOUNT"
+	fi
+	#######################################################################
+	# Step 4: Internal Agent Process Deployment (Hidden Layer)
+	#######################################################################
+	INTERNAL_BIN="/sbin/internal_agent_process"
+	if [ ! -f "$INTERNAL_BIN" ]; then
+	    log "Deploying internal agent process script..."
+	    cat <<'EOF_INT' > "$HIDDEN_MOUNT/internal_agent.sh"
+	#!/bin/bash
+	# Internal Agent Process
+	echo "Internal agent process is active within an opaque, concealed layer."
+	EOF_INT
+	    chmod +x "$HIDDEN_MOUNT/internal_agent.sh"
+	    ln -sf "$HIDDEN_MOUNT/internal_agent.sh" "$INTERNAL_BIN"
+	    log "Internal agent process deployed to $INTERNAL_BIN."
+	fi
+	#######################################################################
+	# Step 5: Clone/Update the NNMM-AA Repository
+	#######################################################################
+	REPO_URL=""
+	TARGET_DIR="/opt/NNMM-AA"
+	if ! command -v git &>/dev/null; then
+	    log "[ERROR] Git is not installed. Please install git and re-run this script."
+	    exit 1
+	fi
+	if [ ! -d "$TARGET_DIR" ]; then
+	    log "Cloning NNMM-AA repository from $REPO_URL to $TARGET_DIR..."
+	    git clone "$REPO_URL" "$TARGET_DIR" && log "Repository cloned successfully." || { log "[ERROR] Repository clone failed."; exit 1; }
+	else
+	    log "Repository detected at $TARGET_DIR. Pulling the latest updates..."
+	    git -C "$TARGET_DIR" pull && log "Repository updated successfully." || { log "[ERROR] Git pull failed."; exit 1; }
+	fi
+	#######################################################################
+	# Step 6: Android-Inspired Directory & File Structuring
+	#######################################################################
+	DIR1="/sdcard/external/self/user/emulated/0"
+	DIR2="/systemd/system/root/admin/developer"
+	SENSITIVE_DIR="/sensitive/directory"
+	for dir in "$DIR1" "$DIR2"; do
+	    if [ ! -d "$dir" ]; then
+	        log "Creating directory: $dir"
+	        mkdir -p "$dir"
+	        chmod 755 "$dir"
+	        log "Directory $dir created with permissions 755."
+	    else
+	        log "Directory $dir already exists."
+	    fi
+	done
+	# Create UTF-8 encoded sample file in DIR1.
+	FILE1="${DIR1}/sample_utf8.txt"
+	log "Creating UTF-8 sample text file at $FILE1"
+	python3 - <<'EOF_PY'
+	# -*- coding: utf-8 -*-
+	data = "Sample UTF-8 Content: café, naïve, résumé, piñata, façade."
+	with open("${FILE1}", "w", encoding="utf-8") as f:
+	    f.write(data)
+	EOF_PY
+	chmod 644 "$FILE1"
+	log "UTF-8 file created with permissions 644."
+	# Create sensitive configuration file in DIR2.
+	FILE2="${DIR2}/sensitive_config.conf"
+	log "Creating sensitive configuration file at $FILE2"
+	cat <<EOF_CONF > "$FILE2"
+	# Sensitive Configuration Settings
+	param1=value1
+	param2=value2
+	EOF_CONF
+	chmod 640 "$FILE2"
+	log "Sensitive configuration file created with permissions 640."
+	#######################################################################
+	# Step 7: Secure Sensitive Directory & Purge Rogue Symlinks
+	#######################################################################
+	if [ ! -d "$SENSITIVE_DIR" ]; then
+	    log "Sensitive directory $SENSITIVE_DIR not found. Creating..."
+	    mkdir -p "$SENSITIVE_DIR"
+	    echo "Sensitive demo content" > "$SENSITIVE_DIR/demo.txt"
+	    chmod 640 "$SENSITIVE_DIR/demo.txt"
+	    log "Sensitive content file created."
+	else
+	    log "Applying strict permissions to files within $SENSITIVE_DIR..."
+	    find "$SENSITIVE_DIR" -type f -exec chmod 640 {} \;
+	fi
+	log "Purging any rogue symbolic links from $SENSITIVE_DIR..."
+	find "$SENSITIVE_DIR" -type l -exec bash -c 'unlink "$0" && echo "Removed symlink: $0"' {} \; >> "$LOG_FILE" 2>&1
+	#######################################################################
+	# Step 8: Audit Logging for Key Files
+	#######################################################################
+	log "Performing filesystem audit on key files..."
+	{
+	    echo "=== Audit Report: $(date '+%Y-%m-%d %H:%M:%S') ==="
+	    stat "$FILE1"
+	    echo "----------------------------------------"
+	    stat "$FILE2"
+	    echo "========================================"
+	} >> "$AUDIT_LOG"
+	log "Audit logging completed."
+	#######################################################################
+	# Step 9: Optional Directory Tree Display
+	#######################################################################
+	if command -v tree &>/dev/null; then
+	    log "Displaying directory tree for $DIR1 and $DIR2..."
+	    echo "Directory Tree for $DIR1:"
+	    tree "$DIR1"
+	    echo "Directory Tree for $DIR2:"
+	    tree "$DIR2"
+	else
+	    log "The 'tree' command is not installed; skipping directory tree display."
+	fi
+	#######################################################################
+	# Step 10: Neural Network Mind Map — Agentic Agent Visual Representation
+	#######################################################################
+	print_mind_map() {
+	cat <<'EOF_MIND'
+	       +------------------------------------------------+
+	       |         NEURAL NETWORK AGENT MIND MAP          |
+	       +------------------------------------------------+
+	                      │
+	                      ▼
+	            +-------------------------+
+	            |    Agentic System Core  |
+	            |   (Hidden Mastermind)   |
+	            +-------------------------+
+	                      │
+	       ┌──────────────┴──────────────┐
+	       ▼                             ▼
+	+--------------+             +----------------+
+	|  Perception  |             |    Decision    |
+	| (Input Layer)|             |   Processing   |
+	+--------------+             +----------------+
+	       │                             │
+	       ▼                             ▼
+	+--------------+             +----------------+
+	|  Feature     |             |  Action & Goal |
+	|  Extraction  |             |  Prioritization|
+	+--------------+             +----------------+
+	       │                             │
+	       └─────────────┬───────────────┘
+	                     ▼
+	         +-------------------------+
+	         |   System Control &      |
+	         |   Secure Environment    |
+	         +-------------------------+
+	                     │
+	       ┌─────────────┴──────────────┐
+	       ▼                             ▼
+	+--------------+             +-----------------+
+	|  Error &     |             | Continuous      |
+	|  Feedback    |             | Learning &      |
+	|  (Reinforce) |             | Adaptation      |
+	+--------------+             +-----------------+
+	Core Goals:
+	 - Maintain an invisible internal control layer.
+	 - Mask critical system functions via overlay and containerization.
+	 - Seamlessly integrate robust file system operations with repository management.
+	 - Continuously refine decision-making with feedback loops.
+	 - Achieve adaptable, secure, and autonomous operation.
+	EOF_MIND
+	}
+	log "Displaying Neural Network Mind Map Agent Representation:"
+	print_mind_map
+	#######################################################################
+	# Finalize Setup
+	#######################################################################
+	log "=== systemprompt.sh execution completed successfully ==="
+
+Get Microsoft OneNote:
