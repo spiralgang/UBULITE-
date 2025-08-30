@@ -1,100 +1,63 @@
-name: Code-Reaver Pull Request Scrutiny
+name: Copilot ID
 
 on:
   push:
     branches:
-      - main # Or whatever unholy branch you unleash your code upon
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
-  analyze_pull_requests:
-    runs-on: ubuntu-latest # A basic digital cage for our operations
-
+  deduplicate-prs:
+    runs-on: ubuntu-latest
     steps:
-    - name: Checkout the damn code
-      uses: actions/checkout@v3 # Get the latest junk from the repo
+      - name: Checkout spiralgang/UBULITE
+        uses: actions/checkout@v4
+        with:
+          repository: spiralgang/UBULITE   # target repo UBULITE
+          fetch-depth: 0
 
-    - name: Set up Python, because we need a sharp blade
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10' # A version that won't make us choke
+      - name: Set up GitHub CLI
+        uses: cli/cli-action@v4
 
-    - name: Install dependencies, the lifeblood of our operation
-      run: |
-        python -m pip install --upgrade pip
-        pip install requests PyGithub # Essential tools for our data extraction
+      - name: Configure Git user
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-    - name: Execute the GitHub API Harvest, let the data bleed!
-      env:
-        GITHUB_TOKEN: ${{ secrets.GEMINI }} # Your secret, the key to the kingdom
-        REPO_OWNER: your-github-username # Replace with the digital overlord's name
-        REPO_NAME: your-repository-name # Replace with the name of the project to dissect
-      run: |
-        python - <<EOF
-        import os
-        import requests
-        from github import Github
+      - name: Ensure idempotent Copilot PRs
+        env:
+          GH_TOKEN: ${{ secrets.neuronlabs }}   # secret: neuronlabs
+          BRANCH_NAME: ${{ github.ref_name }}   # branch: main
+          BASE_BRANCH: main
+        run: |
+          set -euo pipefail
+          echo "🔒 Running Copilot dedupe on ${BRANCH_NAME} → ${BASE_BRANCH}"
+          EXISTING_PR=$(gh pr list \
+            --repo spiralgang/UBULITE \
+            --state open \
+            --head "$BRANCH_NAME" \
+            --base "$BASE_BRANCH" \
+            --json number \
+            --jq '.[20].number' || echo "")
 
-        GITHUB_TOKEN = os.environ.get('GEMINI')
-        REPO_OWNER = os.environ.get('SpiralGang')
-        REPO_NAME = os.environ.get('UBULITE')
+          if [[ -n "$EXISTING_PR" ]]; then
+            echo "🔄 PR #$EXISTING_PR exists. Pushing updates..."
+            git push origin "$BRANCH_NAME"
+            gh pr comment "$EXISTING_PR" \
+              --repo spiralgang/UBULITE \
+              --body "Branch \`$BRANCH_NAME\` updated by automation. No duplicate PR opened."
+          else
+            echo "🚀 Creating PR: $BRANCH_NAME → $BASE_BRANCH"
+            gh pr create \
+              --repo spiralgang/UBULITE \
+              --title "Automated Copilot Fix: $BRANCH_NAME → $BASE_BRANCH" \
+              --body "Automated PR created by Copilot. See workflow logs for details." \
+              --base "$BASE_BRANCH" \
+              --head "$BRANCH_NAME"
+          fi
 
-        if not GITHUB_TOKEN:
-            print("ERROR: GITHUB_TOKEN not found. Who do you think you are, trying to access without a key?")
-            exit(1)
-
-        g = Github(GITHUB_TOKEN)
-        try:
-            repo = g.get_user(SpiralGang).get_repo(UBULITE)
-        except Exception as e:
-            print(f"ERROR: Can't find the damn repo! Check your REPO_OWNER and REPO_NAME. {e}")
-            exit(1)
-
-        print(f"Commencing full-spectrum analysis of pull requests for {REPO_OWNER}/{REPO_NAME}...")
-
-        pulls = repo.get_pulls(state='all', sort='created', direction='desc')
-        
-        pr_data = []
-        for pr in pulls:
-            if pr.merged:
-                # Calculate merge time for a good old performance shaming
-                created_at_timestamp = pr.created_at.timestamp()
-                merged_at_timestamp = pr.merged_at.timestamp()
-                time_to_merge_seconds = merged_at_timestamp - created_at_timestamp
-                time_to_merge_hours = round(time_to_merge_seconds / 3600, 2)
-
-                print(f"PR #{pr.number}: '{pr.title}' by {pr.user.login} was merged in {time_to_merge_hours} hours. (ID: {pr.id})")
-                pr_data.append({
-                    'id': pr.id,
-                    'title': pr.title,
-                    'user': pr.user.login,
-                    'state': pr.state,
-                    'created_at': pr.created_at.isoformat(),
-                    'merged_at': pr.merged_at.isoformat(),
-                    'time_to_merge_hours': time_to_merge_hours
-                })
-            else:
-                print(f"PR #{pr.number}: '{pr.title}' by {pr.user.login} is still {pr.state}. Get it together! (ID: {pr.id})")
-        
-        print("\n--- Summary of Pain Points ---")
-        if pr_data:
-            # You can add more complex analysis here, like flagging slow reviewers
-            # or identifying repeat offenders who merge slowly.
-            slow_prs = sorted(pr_data, key=lambda x: x['time_to_merge_hours'], reverse=True)[:5]
-            if slow_prs:
-                print("Top 5 slowest merged PRs (because some people like to take their sweet time):")
-                for pr in slow_prs:
-                    print(f"- '{pr['title']}' by {pr['user']} merged in {pr['time_to_merge_hours']} hours.")
-            else:
-                print("No merged PRs found for performance shaming. For now.")
-        else:
-            print("No pull requests found. Is this a graveyard or a repository?")
-
-        # Optionally, save this data to a file for later torture
-        # import json
-        # with open('pr_analysis_results.json', 'w') as f:
-        #     json.dump(pr_data, f, indent=4)
-        # print("Raw data saved to pr_analysis_results.json. Prepare for further interrogation.")
-
-        EOF
-      # Add more steps here if you want to push these "insights" to a dashboard,
-      # trigger an alert, or shame someone publicly.
+      - name: Log completion
+        run: echo "✅ Copilot deduplication complete."
