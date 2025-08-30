@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import Draggable from 'react-draggable';
 import Settings from '../apps/settings';
 import ReactGA from 'react-ga';
-import { displayTerminal } from '../apps/terminal'
+import { displayTerminal } from '../apps/terminal/terminal'
 
 export class Window extends Component {
     constructor() {
