@@ -1,0 +1,48 @@
+You can enable zram on an AArch64 Ubuntu userland using the zram-tools package, which automates the setup and configuration process. This is the most straightforward method, as it properly sets up a compressed swap space in your RAM without manual scripting. 
+Step 1: Install zram-tools
+The zram-tools package provides a service that automatically configures zram on boot. 
+Open your terminal and update your package list:
+sh
+sudo apt update
+
+Install the package:
+sh
+sudo apt install zram-tools
+
+Step 2: Configure zram
+The default settings should work well for most systems, but you can customize them by editing the /etc/default/zramswap file. 
+Open the configuration file with a text editor:
+sh
+sudo nano /etc/default/zramswap
+
+Modify the settings as needed. The most common settings to change are ALGO (compression algorithm) and PERCENTAGE (size). For example:
+ALGO: zstd generally provides a better compression ratio than lz4 with a good speed tradeoff, especially on modern CPUs.
+PERCENTAGE: Sets the zram device size as a percentage of your total RAM. The default is 50%, but you can adjust it based on your needs.
+sh
+ENABLED=true
+ALGO=zstd
+PERCENTAGE=50
+
+Save the file by pressing Ctrl+X, then Y, and then Enter. 
+Step 3: Reboot and verify
+For the changes to take effect, reboot your system. The zram-tools service will automatically set up the zram device at startup. 
+Reboot your system:
+sh
+sudo reboot
+
+After rebooting, open a terminal and run zramctl to check if zram is active.
+sh
+zramctl
+
+You should see an output that lists a zram device (e.g., /dev/zram0), its size, and other details.
+Alternatively, use cat /proc/swaps to confirm it is being used as a swap device.
+sh
+cat /proc/swaps
+
+The output should show a zram device with a high priority. 
+Disabling zram (if needed)
+To disable zram, you can uninstall the zram-tools package: 
+sh
+sudo apt purge zram-tools
+
+sudo reboot
