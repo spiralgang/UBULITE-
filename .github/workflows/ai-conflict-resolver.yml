@@ -1,3 +1,4 @@
+---
 name: AI Conflict Resolver
 
 on:
@@ -45,7 +46,8 @@ jobs:
         if: env.GEMINI_AUTH_MODE == 'gcloud'
         uses: google-github-actions/auth@v1
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          workload_identity_provider: >-
+            ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
 
       - name: (gcloud) Install gcloud SDK and obtain access token
@@ -62,14 +64,20 @@ jobs:
           echo "GEMINI_ACCESS_TOKEN=$TOKEN" >> $GITHUB_ENV
 
       - name: Generate GitHub App installation token (if configured)
-        if: ${{ secrets.GITHUB_APP_PRIVATE_KEY != '' && secrets.GITHUB_APP_ID != '' && secrets.GITHUB_APP_INSTALLATION_ID != '' }}
+        if: >-
+          ${{ secrets.GITHUB_APP_PRIVATE_KEY != '' &&
+              secrets.GITHUB_APP_ID != '' &&
+              secrets.GITHUB_APP_INSTALLATION_ID != '' }}
         env:
           GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
           GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-          GITHUB_APP_INSTALLATION_ID: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
+          GITHUB_APP_INSTALLATION_ID: >-
+            ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
         run: |
-          node ./scripts/get-github-app-token.js > /tmp/.gh_app_token || (echo "failed to obtain app token" >&2; exit 2)
-          echo "GITHUB_APP_INSTALLATION_TOKEN=$(cat /tmp/.gh_app_token)" >> $GITHUB_ENV
+          node ./scripts/get-github-app-token.js > /tmp/.gh_app_token || \
+            (echo "failed to obtain app token" >&2; exit 2)
+          echo "GITHUB_APP_INSTALLATION_TOKEN=$(cat /tmp/.gh_app_token)" \
+            >> $GITHUB_ENV
           rm -f /tmp/.gh_app_token
 
       - name: Detect conflicts and analyze issue context
@@ -94,23 +102,28 @@ jobs:
             ISSUE_BODY="${{ github.event.comment.body }}"
             CONTEXT_TYPE="comment"
           fi
-          
+
           # Check for conflict indicators
           CONFLICT_DETECTED="false"
-          if echo "$ISSUE_TITLE $ISSUE_BODY" | grep -iE "(conflict|disagreement|merge.*(issue|problem)|resolve.*conflict|ai.*conflict|workflow.*fail|build.*fail)"; then
+          if echo "$ISSUE_TITLE $ISSUE_BODY" | \
+             grep -iE "(conflict|disagreement|merge.*(issue|problem)|resolve.*conflict|ai.*conflict|workflow.*fail|build.*fail)"; then
             CONFLICT_DETECTED="true"
           fi
-          
+
           # Check for merge conflicts in PR
           if [ "$CONTEXT_TYPE" = "pull_request" ]; then
             git fetch origin main --depth=1 || true
-            if ! git merge-tree $(git merge-base HEAD origin/main) HEAD origin/main | grep -q "<<<<<<< "; then
-              if git diff --name-only origin/main...HEAD | xargs -I {} sh -c 'git show HEAD:{} >/dev/null 2>&1 || echo "CONFLICT_FILE: {}"' | grep -q "CONFLICT_FILE:"; then
+            if ! git merge-tree $(git merge-base HEAD origin/main) \
+                 HEAD origin/main | grep -q "<<<<<<< "; then
+              if git diff --name-only origin/main...HEAD | \
+                 xargs -I {} sh -c \
+                 'git show HEAD:{} >/dev/null 2>&1 || echo "CONFLICT_FILE: {}"' | \
+                 grep -q "CONFLICT_FILE:"; then
                 CONFLICT_DETECTED="true"
               fi
             fi
           fi
-          
+
           echo "CONFLICT_DETECTED=$CONFLICT_DETECTED" >> $GITHUB_OUTPUT
           echo "ISSUE_NUMBER=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
           echo "CONTEXT_TYPE=$CONTEXT_TYPE" >> $GITHUB_OUTPUT
@@ -125,7 +138,8 @@ jobs:
           GEMINI_API_ENDPOINT: ${{ env.GEMINI_API_ENDPOINT }}
           GEMINI_API_KEY: ${{ secrets.GEMINI }}
           GEMINI_ACCESS_TOKEN: ${{ env.GEMINI_ACCESS_TOKEN }}
-          GITHUB_APP_INSTALLATION_TOKEN: ${{ env.GITHUB_APP_INSTALLATION_TOKEN || '' }}
+          GITHUB_APP_INSTALLATION_TOKEN: >-
+            ${{ env.GITHUB_APP_INSTALLATION_TOKEN || '' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ steps.conflict_detection.outputs.ISSUE_NUMBER }}
           CONTEXT_TYPE: ${{ steps.conflict_detection.outputs.CONTEXT_TYPE }}
@@ -134,8 +148,11 @@ jobs:
           node ./scripts/ai-conflict-resolver.js
 
       - name: Upload conflict resolution artifact
-        if: always() && steps.conflict_detection.outputs.CONFLICT_DETECTED == 'true'
+        if: >-
+          always() &&
+          steps.conflict_detection.outputs.CONFLICT_DETECTED == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: conflict-resolution-output-${{ steps.conflict_detection.outputs.ISSUE_NUMBER }}
+          name: >-
+            conflict-resolution-output-${{ steps.conflict_detection.outputs.ISSUE_NUMBER }}
           path: ./artifacts/conflict-resolution-*.json
