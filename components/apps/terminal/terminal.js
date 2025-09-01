@@ -794,7 +794,7 @@ code, chrome, spotify, settings, trash, terminal
         return "Available commands: [ cd, ls, pwd, echo, clear, exit, mkdir, code, spotify, chrome, help, git, network-scan, sys-info, shell-type, lang-detect, github, gitlab, huggingface, venice, smart-install, auto-fix, monitor-commands ]";
     }
 
-    xss(str) {
+    xss = (str) => {
         if (!str) return;
         return str.split('').map(char => {
             switch (char) {
