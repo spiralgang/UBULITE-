@@ -706,7 +706,7 @@ Swap:             0           0           0
     }
 
     // Smart installation system from TermiMation.py
-    handleSmartInstall = (args) => {
+    handleSmartInstall(args) {
         const package_name = args[0];
         if (!package_name) {
             return "Usage: smart-install <package-name>";
@@ -722,7 +722,7 @@ Swap:             0           0           0
     }
 
     // Auto-fix system from TermiMation.py  
-    handleAutoFix = (args) => {
+    handleAutoFix(args) {
         const issue_type = args[0] || 'permissions';
         
         const fixes = {
@@ -735,7 +735,7 @@ Swap:             0           0           0
     }
 
     // Command monitoring from TermiMation.py
-    handleCommandMonitoring = (args) => {
+    handleCommandMonitoring(args) {
         const action = args[0] || 'status';
         
         if (action === 'start') {
@@ -749,7 +749,7 @@ Swap:             0           0           0
         }
     }
 
-    getHelpText = () => {
+    getHelpText() {
         return `UBULITE Enhanced Terminal v2.0 - Complete Consolidation - Help
         
 <div class="text-ubt-green font-bold">File System:</div>
@@ -783,14 +783,14 @@ code, chrome, spotify, settings, trash, terminal
 <div class="text-yellow-400">All terminal files from folder now integrated into single component</div>`;
     }
 
-    getCommandHistory = () => {
+    getCommandHistory() {
         if (this.prev_commands.length === 0) return "No commands in history";
         return this.prev_commands.slice(-10).map((cmd, idx) => 
             `${this.prev_commands.length - 10 + idx + 1}  ${cmd}`
         ).join('\n');
     }
 
-    getAvailableCommands = () => {
+    getAvailableCommands() {
         return "Available commands: [ cd, ls, pwd, echo, clear, exit, mkdir, code, spotify, chrome, help, git, network-scan, sys-info, shell-type, lang-detect, github, gitlab, huggingface, venice, smart-install, auto-fix, monitor-commands ]";
     }
 
