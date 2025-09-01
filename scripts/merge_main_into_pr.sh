@@ -50,4 +50,4 @@ fi
 echo "[5/5] Merge succeeded, pushing branch to origin..."
 git push -u origin "$BRANCH"
 
-echo "[+] Done. Branch '$BRANCH' is updated with origin/main and pushed.
+echo "[+] Done. Branch '$BRANCH' is updated with origin/main and pushed."
