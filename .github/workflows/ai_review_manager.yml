@@ -25,7 +25,7 @@ jobs:
 
     - name: Execute the GitHub API Harvest, let the data bleed!
       env:
-        GITHUB_TOKEN: ${{ secrets.GEMINI }} # Proper secret reference
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Proper secret reference
         REPO_OWNER: spiralgang             # Explicitly set as environment variable
         REPO_NAME: UBULITE                 # Explicitly set as environment variable
       run: |
