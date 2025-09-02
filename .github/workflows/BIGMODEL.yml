@@ -1,7 +1,7 @@
 ---
 name: BigModel/Zhipu AI Integration
 
-on:
+"on":
   workflow_dispatch:
     inputs:
       task_type:
@@ -41,7 +41,9 @@ permissions:
 env:
   BIGMODEL_MODEL: ${{ secrets.BIGMODEL_MODEL || 'glm-4' }}
   ZHIPU_MODEL: ${{ secrets.ZHIPU_MODEL || 'glm-4-9b-code' }}
-  BIGMODEL_ENDPOINT: ${{ secrets.BIGMODEL_ENDPOINT || 'https://open.bigmodel.cn/api/paas/v4/chat/completions' }}
+  BIGMODEL_ENDPOINT: >-
+    ${{ secrets.BIGMODEL_ENDPOINT ||
+    'https://open.bigmodel.cn/api/paas/v4/chat/completions' }}
   MAX_TOKENS_PER_CALL: ${{ secrets.MAX_TOKENS_PER_CALL || '1200' }}
   MAX_DAILY_CALLS: ${{ secrets.MAX_DAILY_CALLS || '500' }}
   ROUTE_THRESHOLD_CHARS: ${{ secrets.ROUTE_THRESHOLD_CHARS || '8000' }}
@@ -97,27 +99,32 @@ jobs:
         run: |
           # Get changed files for code review
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            CHANGED_FILES=$(git diff --name-only origin/main...HEAD | head -5)
+            CHANGED_FILES=$(git diff --name-only \
+              origin/main...HEAD | head -5)
           else
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | head -5)
+            CHANGED_FILES=$(git diff --name-only \
+              HEAD~1 HEAD | head -5)
           fi
-          
+
           if [ -z "$CHANGED_FILES" ]; then
             echo "No changed files to review"
             exit 0
           fi
-          
+
           # Create code review payload
           echo '{
             "task_type": "code",
             "messages": [
               {
                 "role": "system",
-                "content": "You are a code reviewer. Analyze the provided code changes and provide feedback."
+                "content": >-
+                  You are a code reviewer. Analyze the provided
+                  code changes and provide feedback.
               },
               {
                 "role": "user",
-                "content": "Please review these changed files: '"$CHANGED_FILES"'"
+                "content": >-
+                  Please review these changed files: '"$CHANGED_FILES"'
               }
             ],
             "temperature": 0.2
