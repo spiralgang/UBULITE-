@@ -1,0 +1,336 @@
+name: AI Conflict Resolver
+
+# Automated conflict detection and resolution for every issue action
+on:
+  issues:
+    types: [opened, edited, commented, labeled]
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  id-token: write
+
+env:
+  GEMINI_MODEL: "gemini-pro-2.5"
+  GEMINI_API_ENDPOINT: ${{ secrets.GEMINI_API_ENDPOINT }}
+
+jobs:
+  ai-conflict-resolver:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Create AI Conflict Resolver Script
+        run: |
+          mkdir -p scripts/ai-conflict-resolver
+          cat > scripts/ai-conflict-resolver/conflict-resolver.js << 'EOF'
+          #!/usr/bin/env node
+          const { execSync } = require('child_process');
+          const { writeFileSync, existsSync, mkdirSync } = require('fs');
+          const https = require('https');
+
+          // Environment variables
+          const env = process.env;
+          const API_ENDPOINT = env.GEMINI_API_ENDPOINT;
+          const API_KEY = env.GEMINI_API_KEY || env.GEMINI;
+          const MODEL = env.GEMINI_MODEL || "gemini-pro-2.5";
+          const GITHUB_TOKEN = env.GITHUB_TOKEN;
+          const GITHUB_EVENT = JSON.parse(env.GITHUB_EVENT_PATH ? require('fs').readFileSync(env.GITHUB_EVENT_PATH, 'utf8') : '{}');
+          const GITHUB_REPOSITORY = env.GITHUB_REPOSITORY;
+          const GITHUB_EVENT_NAME = env.GITHUB_EVENT_NAME;
+
+          if (!API_ENDPOINT || !API_KEY) {
+            console.error("Missing GEMINI_API_ENDPOINT or GEMINI_API_KEY. Abort.");
+            process.exit(2);
+          }
+
+          // Utility: safely run shell commands
+          function run(cmd) {
+            try {
+              return execSync(cmd, { encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] }).trim();
+            } catch {
+              return "";
+            }
+          }
+
+          // Detect conflict type and analyze content
+          function analyzeForConflicts(eventType, payload) {
+            const conflicts = [];
+            
+            if (eventType === 'issues' || eventType === 'issue_comment') {
+              const issue = payload.issue;
+              const comment = payload.comment;
+              
+              // Check for merge conflicts in title or body
+              const textToCheck = [
+                issue?.title || '',
+                issue?.body || '',
+                comment?.body || ''
+              ].join(' ').toLowerCase();
+              
+              if (textToCheck.includes('conflict') || textToCheck.includes('merge') && textToCheck.includes('fail')) {
+                conflicts.push({
+                  type: 'merge_conflict',
+                  severity: 'high',
+                  location: issue ? `issue #${issue.number}` : `comment on issue #${payload.issue?.number}`,
+                  content: textToCheck.substring(0, 200)
+                });
+              }
+              
+              // Check for workflow conflicts
+              if (textToCheck.includes('workflow') && (textToCheck.includes('fail') || textToCheck.includes('error'))) {
+                conflicts.push({
+                  type: 'workflow_conflict',
+                  severity: 'high',
+                  location: issue ? `issue #${issue.number}` : `comment on issue #${payload.issue?.number}`,
+                  content: textToCheck.substring(0, 200)
+                });
+              }
+              
+              // Check for AI reviewer conflicts
+              if (textToCheck.includes('ai') && textToCheck.includes('review') && textToCheck.includes('conflict')) {
+                conflicts.push({
+                  type: 'ai_review_conflict',
+                  severity: 'medium',
+                  location: issue ? `issue #${issue.number}` : `comment on issue #${payload.issue?.number}`,
+                  content: textToCheck.substring(0, 200)
+                });
+              }
+            }
+            
+            if (eventType === 'pull_request') {
+              const pr = payload.pull_request;
+              
+              // Check if PR has merge conflicts
+              if (pr?.mergeable === false) {
+                conflicts.push({
+                  type: 'pr_merge_conflict',
+                  severity: 'high',
+                  location: `PR #${pr.number}`,
+                  content: `PR "${pr.title}" has merge conflicts`
+                });
+              }
+              
+              // Check for build failures
+              if (pr?.title?.toLowerCase().includes('conflict') || pr?.body?.toLowerCase().includes('conflict')) {
+                conflicts.push({
+                  type: 'pr_conflict_mentioned',
+                  severity: 'medium',
+                  location: `PR #${pr.number}`,
+                  content: pr.title + ' ' + (pr.body || '').substring(0, 200)
+                });
+              }
+            }
+            
+            return conflicts;
+          }
+
+          // Generate AI resolution recommendations
+          async function generateResolution(conflicts) {
+            if (conflicts.length === 0) return null;
+            
+            const prompt = `You are an AI Conflict Resolver for a software development team. 
+          Analyze the following conflicts and provide step-by-step resolution guidance:
+
+          ${conflicts.map((c, i) => 
+            `${i+1}. Type: ${c.type}
+             Severity: ${c.severity}
+             Location: ${c.location}
+             Content: ${c.content}`
+          ).join('\n')}
+
+          Provide a structured response with:
+          1. Conflict analysis summary
+          2. Recommended resolution steps
+          3. Assignee recommendations
+          4. Urgency assessment
+          5. Whether this can be automatically resolved
+
+          Format as JSON with fields: summary, steps, recommended_assignee, urgency, auto_resolvable`;
+
+            const payload = {
+              model: MODEL,
+              input: prompt,
+              options: {
+                temperature: 0.1,
+                max_output_tokens: 1500
+              }
+            };
+
+            return new Promise((resolve, reject) => {
+              const postData = JSON.stringify(payload);
+              const options = {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${API_KEY}`,
+                  'Content-Length': Buffer.byteLength(postData)
+                }
+              };
+
+              const req = https.request(API_ENDPOINT, options, (res) => {
+                let data = '';
+                res.on('data', (chunk) => data += chunk);
+                res.on('end', () => {
+                  try {
+                    const response = JSON.parse(data);
+                    resolve(response);
+                  } catch {
+                    resolve({ content: data });
+                  }
+                });
+              });
+
+              req.on('error', reject);
+              req.write(postData);
+              req.end();
+            });
+          }
+
+          // Post resolution comment to GitHub
+          async function postResolutionComment(issueNumber, resolution, conflicts) {
+            if (!GITHUB_TOKEN || !issueNumber) return;
+            
+            const maxConflictType = conflicts.reduce((max, c) => 
+              c.severity === 'high' ? 'high' : (max === 'high' ? 'high' : c.severity), 'low');
+            
+            const severityIcon = maxConflictType === 'high' ? '🔴' : (maxConflictType === 'medium' ? '🟡' : '🟢');
+            
+            const comment = `## 🤖 AI Conflict Resolver
+
+          ${severityIcon} **Conflict Detected:** ${conflicts[0]?.type.replace('_', ' ') || 'general conflict'}
+          ⚡ **Urgency:** ${resolution?.urgency || maxConflictType}
+
+          ### Summary
+          ${resolution?.summary || 'Automated conflict analysis completed'}
+
+          ### Resolution Steps
+          ${Array.isArray(resolution?.steps) ? 
+            resolution.steps.map((step, i) => `${i+1}. ${step}`).join('\n') :
+            '1. Review conflicted areas\n2. Apply appropriate resolution strategy\n3. Test changes thoroughly'
+          }
+
+          **Recommended Assignee:** @${resolution?.recommended_assignee || 'spiralgang'}
+          ${resolution?.auto_resolvable ? '✅ **Automated fix possible:** This conflict may be resolvable automatically' : '⚠️ **Manual intervention required**'}
+
+          ---
+          *Generated by AI Conflict Resolver v1.0*`;
+
+            const postData = JSON.stringify({ body: comment });
+            const options = {
+              hostname: 'api.github.com',
+              path: `/repos/${GITHUB_REPOSITORY}/issues/${issueNumber}/comments`,
+              method: 'POST',
+              headers: {
+                'Authorization': `token ${GITHUB_TOKEN}`,
+                'Content-Type': 'application/json',
+                'User-Agent': 'AI-Conflict-Resolver/1.0',
+                'Content-Length': Buffer.byteLength(postData)
+              }
+            };
+
+            return new Promise((resolve) => {
+              const req = https.request(options, (res) => {
+                let data = '';
+                res.on('data', (chunk) => data += chunk);
+                res.on('end', () => {
+                  console.log(`Posted resolution comment: ${res.statusCode}`);
+                  resolve();
+                });
+              });
+              req.on('error', (err) => {
+                console.error('Failed to post comment:', err.message);
+                resolve();
+              });
+              req.write(postData);
+              req.end();
+            });
+          }
+
+          // Main execution
+          async function main() {
+            try {
+              console.log(`AI Conflict Resolver triggered by ${GITHUB_EVENT_NAME} event`);
+              
+              const conflicts = analyzeForConflicts(GITHUB_EVENT_NAME, GITHUB_EVENT);
+              
+              if (conflicts.length === 0) {
+                console.log("No conflicts detected. Exiting cleanly.");
+                return;
+              }
+
+              console.log(`Detected ${conflicts.length} potential conflicts:`);
+              conflicts.forEach(c => console.log(` - ${c.type} (${c.severity}) at ${c.location}`));
+
+              const resolution = await generateResolution(conflicts);
+              console.log("Generated AI resolution recommendations");
+
+              // Save artifact
+              const artifactsDir = "./artifacts";
+              if (!existsSync(artifactsDir)) mkdirSync(artifactsDir, { recursive: true });
+              
+              const sha = run('git rev-parse --short HEAD') || 'unknown';
+              const artifactPath = `${artifactsDir}/conflict-resolution-${sha}.json`;
+              const artifact = {
+                event: GITHUB_EVENT_NAME,
+                conflicts,
+                resolution,
+                generated_at: new Date().toISOString()
+              };
+              writeFileSync(artifactPath, JSON.stringify(artifact, null, 2));
+              console.log("Saved artifact:", artifactPath);
+
+              // Post comment for issues/PRs
+              let issueNumber = null;
+              if (GITHUB_EVENT.issue) issueNumber = GITHUB_EVENT.issue.number;
+              else if (GITHUB_EVENT.pull_request) issueNumber = GITHUB_EVENT.pull_request.number;
+              
+              if (issueNumber) {
+                await postResolutionComment(issueNumber, resolution?.content ? JSON.parse(resolution.content || '{}') : resolution, conflicts);
+              }
+
+              console.log("AI Conflict Resolution completed successfully");
+            } catch (err) {
+              console.error("Error in AI Conflict Resolver:", err);
+              process.exit(1);
+            }
+          }
+
+          main();
+          EOF
+          
+          chmod +x scripts/ai-conflict-resolver/conflict-resolver.js
+
+      - name: Run AI Conflict Resolution Analysis
+        id: conflict_analysis
+        env:
+          GEMINI_MODEL: ${{ env.GEMINI_MODEL }}
+          GEMINI_API_ENDPOINT: ${{ env.GEMINI_API_ENDPOINT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          node scripts/ai-conflict-resolver/conflict-resolver.js
+
+      - name: Upload conflict resolution artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-conflict-resolution-${{ github.run_number }}
+          path: ./artifacts/conflict-resolution-*.json
