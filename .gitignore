@@ -36,3 +36,4 @@ yarn-error.log*
 
 # AI artifacts (keep real artifacts, exclude test ones)
 artifacts/*test*.json
+__pycache__/
