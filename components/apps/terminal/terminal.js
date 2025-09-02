@@ -27,8 +27,7 @@ export class Terminal extends Component {
             tools: ["git", "docker", "npm", "pip", "gradle", "maven", "cmake", "make"],
             network: ["ping", "curl", "wget", "netstat", "ss", "iptables", "nmap", "tcpdump"],
             system: ["ps", "top", "htop", "df", "du", "free", "uname", "lscpu", "lsusb"]
-        };
-
+        }
         // Network tools from consolidated files
         this.network_tools = [
             'ifconfig', 'ip', 'ping', 'traceroute', 'netstat', 'ss', 'nslookup', 'dig', 'host', 
@@ -48,14 +47,12 @@ export class Terminal extends Component {
             'gitlab': 'GitLab projects', 
             'huggingface': 'HuggingFace models',
             'mediafire': 'MediaFire storage'
-        };
-
+        }
         // Smart package knowledge base from TermiMation.py
         this.package_knowledge = {
             'pip': 'python3-pip',
             'pip3': 'python3-pip'
-        };
-
+        }
         // Error patterns and auto-fix capabilities from TermiMation.py
         this.error_patterns = new Map();
         this.auto_fix_history = [];
@@ -74,8 +71,7 @@ export class Terminal extends Component {
             '.rb': 'ruby',
             '.sh': 'bash',
             '.zsh': 'zsh'
-        };
-
+        }
         this.state = {
             terminal: [],
         }
@@ -96,7 +92,7 @@ export class Terminal extends Component {
     }
 
     // Load user preferences from localStorage
-    loadTerminalPreferences = () => {
+    loadTerminalPreferences() {
         const prefs = localStorage.getItem('terminal_prefs');
         if (prefs) {
             const parsed = JSON.parse(prefs);
@@ -106,28 +102,28 @@ export class Terminal extends Component {
     }
 
     // Save user preferences 
-    saveTerminalPreferences = () => {
+    saveTerminalPreferences() {
         const prefs = {
             shell_type: this.shell_type,
             command_history: this.prev_commands.slice(-100) // Keep last 100 commands
-        };
+        }
         localStorage.setItem('terminal_prefs', JSON.stringify(prefs));
     }
 
-    reStartTerminal = () => {
+    reStartTerminal() {
         clearInterval(this.cursor);
         $('#terminal-body').empty();
         this.appendTerminalRow();
     }
 
-    appendTerminalRow = () => {
+    appendTerminalRow() {
         let terminal = this.state.terminal;
         terminal.push(this.terminalRow(this.terminal_rows));
         this.setState({ terminal });
         this.terminal_rows += 2;
     }
 
-    terminalRow = (id) => {
+    terminalRow(id) {
         const promptSymbol = this.shell_type === 'zsh' ? '%' : '$';
         const username = this.shell_type === 'zsh' ? 'user@ubulite' : 'vivek@Dell';
         
@@ -161,16 +157,16 @@ export class Terminal extends Component {
         );
     }
 
-    focusCursor = (e) => {
+    focusCursor(e) {
         clearInterval(this.cursor);
         this.startCursor($(e.target).data("row-id"));
     }
 
-    unFocusCursor = (e) => {
+    unFocusCursor(e) {
         this.stopCursor($(e.target).data("row-id"));
     }
 
-    startCursor = (id) => {
+    startCursor(id) {
         clearInterval(this.cursor);
         $(`input#terminal-input-${id}`).trigger("focus");
         
@@ -194,22 +190,22 @@ export class Terminal extends Component {
         }, 500);
     }
 
-    stopCursor = (id) => {
+    stopCursor(id) {
         clearInterval(this.cursor);
         $(`#cursor-${id}`).css({ visibility: 'visible' });
     }
 
-    removeCursor = (id) => {
+    removeCursor(id) {
         this.stopCursor(id);
         $(`#cursor-${id}`).css({ display: 'none' });
     }
 
-    clearInput = (id) => {
+    clearInput(id) {
         $(`input#terminal-input-${id}`).trigger("blur");
     }
 
     // Auto-completion functionality
-    showAutoComplete = (input, id) => {
+    showAutoComplete(input, id) {
         const words = input.split(' ');
         const lastWord = words[words.length - 1];
         
@@ -251,7 +247,7 @@ export class Terminal extends Component {
         return suggestions.slice(0, 5);
     }
 
-    checkKey = (e) => {
+    checkKey(e) {
         const terminal_row_id = $(e.target).data("row-id");
         
         if (e.key === "Enter") {
@@ -301,7 +297,7 @@ export class Terminal extends Component {
         }
     }
 
-    childDirectories = (parent) => {
+    childDirectories(parent) {
         let files = [];
         files.push(`<div class="flex justify-start flex-wrap">`)
         if (this.child_directories[parent]) {
@@ -315,12 +311,12 @@ export class Terminal extends Component {
         return files;
     }
 
-    closeTerminal = () => {
+    closeTerminal() {
         $("#close-terminal").trigger('click');
     }
 
     // Enhanced command handler with consolidated functionality
-    handleCommands = (command, rowId) => {
+    handleCommands(command, rowId) {
         let words = command.split(' ').filter(Boolean);
         let main = words[0];
         words.shift();
@@ -448,7 +444,7 @@ export class Terminal extends Component {
                         'sendmsg': 'gedit',
                         'about-vivek': 'about-vivek',
                         'todoist': 'todo-ist'
-                    };
+                    }
                     const appName = appMap[main] || main;
                     this.props.openApp && this.props.openApp(appName);
                     result = `Opening ${main}...`;
@@ -518,7 +514,7 @@ export class Terminal extends Component {
     }
 
     // Enhanced command implementations
-    handleCdCommand = (words, rest) => {
+    handleCdCommand(words, rest) {
         if (words.length === 0 || rest === "") {
             this.current_directory = "~";
             this.curr_dir_name = "root";
@@ -541,7 +537,7 @@ export class Terminal extends Component {
         }
     }
 
-    handleLsCommand = (words, rest) => {
+    handleLsCommand(words, rest) {
         let target = words[0] || this.curr_dir_name;
         if (words.length > 1) return "ls: too many arguments";
         if (target === "personal-documents") return "Nope! 🙃";
@@ -552,7 +548,7 @@ export class Terminal extends Component {
         }
     }
 
-    detectLanguage = (filename) => {
+    detectLanguage(filename) {
         const ext = filename.substring(filename.lastIndexOf('.'));
         if (this.language_runners[ext]) {
             return `Detected language: ${ext} - Use: ${this.language_runners[ext]}`;
@@ -560,7 +556,7 @@ export class Terminal extends Component {
         return "Language not recognized. Supported: " + Object.keys(this.language_runners).join(', ');
     }
 
-    runCode = (filename) => {
+    runCode(filename) {
         if (!filename) return "Usage: run-code <filename>";
         const ext = filename.substring(filename.lastIndexOf('.'));
         const runner = this.language_runners[ext];
@@ -570,25 +566,25 @@ export class Terminal extends Component {
         return "Unsupported file type for execution";
     }
 
-    simulateNetworkCommand = (cmd, args) => {
+    simulateNetworkCommand(cmd, args) {
         const responses = {
             'ping': `PING ${args || 'localhost'} (192.0.2.1) 56(84) bytes of data.\n64 bytes from localhost: icmp_seq=1 ttl=64 time=0.045 ms\n[Simulation - Android network restricted]`,
             'curl': `HTTP/1.1 200 OK\nContent-Type: text/html\n[Simulation - Would fetch ${args || 'URL'}]`,
             'wget': `Resolving ${args || 'example.com'}... 198.51.100.1\nConnecting to ${args}... connected.\n[Simulation - Would download file]`,
             'nmap': `Starting Nmap scan...\nHost is up (0.00050s latency).\n[Simulation - Network scanning restricted on mobile]`
-        };
+        }
         return responses[cmd] || `${cmd}: command simulated`;
     }
 
-    getNetworkStatus = () => {
+    getNetworkStatus() {
         return `Active Internet connections:\nProto Recv-Q Send-Q  Local Address          Foreign Address        State\ntcp        0      0  192.0.2.1:631          198.51.100.1:*               LISTEN\n[Limited network access on Android]`;
     }
 
-    performNetworkScan = () => {
+    performNetworkScan() {
         return `Network Scan Results:\n• WiFi: Connected to local network\n• Mobile Data: Available\n• Bluetooth: Enabled\n• VPN: Disconnected\n[Detailed scanning limited on Android 10]`;
     }
 
-    getSystemInfo = () => {
+    getSystemInfo() {
         return `System Information:
 • OS: Android 10 (API 29)
 • Device: Samsung Galaxy S9+ (Limited Storage)
@@ -599,7 +595,7 @@ export class Terminal extends Component {
 • Terminal: UBULITE Enhanced v2.0`;
     }
 
-    getProcessList = () => {
+    getProcessList() {
         return `PID   COMMAND
 1     init
 2     [kthreadd]
@@ -609,33 +605,33 @@ export class Terminal extends Component {
 [Process list limited on Android]`;
     }
 
-    getDiskUsage = () => {
+    getDiskUsage() {
         return `Filesystem      1K-blocks    Used Available Use% Mounted on
 /dev/root         8000000 6000000   2000000  75% /
 tmpfs             1000000       0   1000000   0% /tmp
 [Storage optimized for Android 10]`;
     }
 
-    getMemoryInfo = () => {
+    getMemoryInfo() {
         return `              total        used        free      shared  buff/cache   available
 Mem:        4000000     2000000     1000000      100000     1000000     1800000
 Swap:             0           0           0
 [Memory usage optimized for mobile]`;
     }
 
-    handleGitCommand = (words) => {
+    handleGitCommand(words) {
         const gitCommands = {
             'status': 'On branch main\nnothing to commit, working tree clean',
             'log': 'commit abc123 (HEAD -> main)\nAuthor: User\nDate: Now\n\nLatest commit',
             'branch': '* main\n  develop',
             'pull': 'Already up to date.',
             'push': 'Everything up-to-date'
-        };
+        }
         const cmd = words[0];
         return gitCommands[cmd] || `git ${cmd}: simulated command`;
     }
 
-    handleGitHubCLI = (words) => {
+    handleGitHubCLI(words) {
         if (!words.length) return "gh: GitHub CLI - try 'gh --help'";
         const cmd = words[0];
         const responses = {
@@ -643,27 +639,25 @@ Swap:             0           0           0
             'pr': 'No pull requests found in current repository',
             'repo': 'Repository: spiralgang/UBULITE',
             'issue': 'No issues found'
-        };
+        }
         return responses[cmd] || `gh ${cmd}: command simulated`;
     }
 
-    handlePackageManager = (manager, words) => {
+    handlePackageManager(manager, words) {
         const responses = {
             'apt': `Reading package lists... Done\n[Simulation - Package management limited on Android]`,
             'npm': `npm info: ${words.join(' ')}\n[Node.js package simulation]`,
             'pip': `Collecting ${words.join(' ')}\n[Python package simulation]`
-        };
+        }
         return responses[manager] || `${manager}: simulated`;
     }
 
-    simulateSystemCommand = (cmd, args) => {
+    simulateSystemCommand(cmd, args) {
         return `${cmd} ${args}: System command simulated\n[Limited system access on Android 10]`;
     }
 
-    }
-
     // Cloud storage integration from Korg Shell
-    handleCloudStorage = (service, args) => {
+    handleCloudStorage(service, args) {
         const operations = {
             'github': () => {
                 if (args[0] === 'clone') {
@@ -685,13 +679,12 @@ Swap:             0           0           0
             'mediafire': () => {
                 return `MediaFire storage: ${args.join(' ')}\n[File upload/download simulation]`;
             }
-        };
-        
+        }
         return operations[service] ? operations[service]() : `${service}: Cloud service not recognized`;
     }
 
     // Venice AI integration from Korg Shell
-    handleVeniceAI = (args) => {
+    handleVeniceAI(args) {
         const command = args.join(' ');
         
         if (command.startsWith('##Persona')) {
@@ -706,7 +699,7 @@ Swap:             0           0           0
     }
 
     // Smart installation system from TermiMation.py
-    handleSmartInstall = (args) => {
+    handleSmartInstall(args) {
         const package_name = args[0];
         if (!package_name) {
             return "Usage: smart-install <package-name>";
@@ -722,20 +715,19 @@ Swap:             0           0           0
     }
 
     // Auto-fix system from TermiMation.py  
-    handleAutoFix = (args) => {
+    handleAutoFix(args) {
         const issue_type = args[0] || 'permissions';
         
         const fixes = {
             'permissions': 'Scanning for permission issues...\n[Auto-fixed 3 executable permissions]\n[Learning pattern: script files -> chmod +x]',
             'packages': 'Checking package dependencies...\n[Resolved 2 missing packages automatically]\n[dpkg status: healthy]',
             'commands': 'Monitoring command execution...\n[Command not found handler: active]\n[Smart install agent: monitoring]'
-        };
-        
+        }
         return fixes[issue_type] || `Auto-fix system: Monitoring ${issue_type}\n[Real-time error pattern learning active]`;
     }
 
     // Command monitoring from TermiMation.py
-    handleCommandMonitoring = (args) => {
+    handleCommandMonitoring(args) {
         const action = args[0] || 'status';
         
         if (action === 'start') {
@@ -749,7 +741,7 @@ Swap:             0           0           0
         }
     }
 
-    getHelpText = () => {
+    getHelpText() {
         return `UBULITE Enhanced Terminal v2.0 - Complete Consolidation - Help
         
 <div class="text-ubt-green font-bold">File System:</div>
@@ -783,14 +775,14 @@ code, chrome, spotify, settings, trash, terminal
 <div class="text-yellow-400">All terminal files from folder now integrated into single component</div>`;
     }
 
-    getCommandHistory = () => {
+    getCommandHistory() {
         if (this.prev_commands.length === 0) return "No commands in history";
         return this.prev_commands.slice(-10).map((cmd, idx) => 
             `${this.prev_commands.length - 10 + idx + 1}  ${cmd}`
         ).join('\n');
     }
 
-    getAvailableCommands = () => {
+    getAvailableCommands() {
         return "Available commands: [ cd, ls, pwd, echo, clear, exit, mkdir, code, spotify, chrome, help, git, network-scan, sys-info, shell-type, lang-detect, github, gitlab, huggingface, venice, smart-install, auto-fix, monitor-commands ]";
     }
 
