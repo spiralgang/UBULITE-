@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Puter.js Complete Integration Template</title>
+  <script>window.FEAT_PUTER = true;</script>
+  <script src="https://js.puter.com/v2/"></script>
+</head>
+<body>
+  <div id="app">
+    <h1>Puter.js Complete Integration</h1>
+    
+    <div id="ai-section">
+      <h2>AI Chat</h2>
+      <input type="text" id="ai-input" placeholder="Ask something..." />
+      <button onclick="askAI()">Ask AI</button>
+      <div id="ai-response"></div>
+    </div>
+
+    <div id="file-section">
+      <h2>File Operations</h2>
+      <button onclick="listFiles()">List Files</button>
+      <button onclick="createTestFile()">Create Test File</button>
+      <div id="file-output"></div>
+    </div>
+
+    <div id="auth-section">
+      <h2>Authentication</h2>
+      <button onclick="checkAuth()">Check Auth Status</button>
+      <div id="auth-output"></div>
+    </div>
+  </div>
+
+  <script>
+    // Initialize Puter.js components
+    let aiChat, fileManager, auth;
+
+    async function initializePuter() {
+      try {
+        // Initialize AI Chat
+        aiChat = new PuterAIChat();
+        await aiChat.initialize();
+
+        // Initialize File Manager
+        fileManager = new PuterFileManager();
+        await fileManager.initialize();
+
+        // Initialize Auth
+        auth = new PuterAuth();
+        await auth.initialize();
+
+        console.log('✅ All Puter.js components initialized');
+        document.getElementById('app').style.opacity = '1';
+      } catch (error) {
+        console.error('❌ Failed to initialize Puter.js:', error);
+        document.getElementById('app').innerHTML = `
+          <h1>Puter.js Integration Error</h1>
+          <p>Failed to initialize: ${error.message}</p>
+        `;
+      }
+    }
+
+    async function askAI() {
+      const input = document.getElementById('ai-input');
+      const output = document.getElementById('ai-response');
+      
+      if (!input.value.trim()) return;
+
+      output.innerHTML = '<p>Thinking...</p>';
+      
+      try {
+        const response = await aiChat.chat(input.value);
+        if (response.success) {
+          output.innerHTML = `<p><strong>AI:</strong> ${response.response.content || response.response}</p>`;
+        } else {
+          output.innerHTML = `<p style="color: red;">Error: ${response.error}</p>`;
+        }
+      } catch (error) {
+        output.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+      }
+      
+      input.value = '';
+    }
+
+    async function listFiles() {
+      const output = document.getElementById('file-output');
+      output.innerHTML = '<p>Loading files...</p>';
+
+      try {
+        const result = await fileManager.listFiles('/');
+        if (result.success) {
+          const filesList = result.files.map(file => `<li>${file.name || file}</li>`).join('');
+          output.innerHTML = `<ul>${filesList}</ul>`;
+        } else {
+          output.innerHTML = `<p style="color: red;">Error: ${result.error}</p>`;
+        }
+      } catch (error) {
+        output.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+      }
+    }
+
+    async function createTestFile() {
+      const output = document.getElementById('file-output');
+      
+      try {
+        const content = `Test file created at ${new Date().toISOString()}`;
+        const result = await fileManager.writeFile('/test.txt', content);
+        
+        if (result.success) {
+          output.innerHTML = '<p style="color: green;">Test file created successfully!</p>';
+        } else {
+          output.innerHTML = `<p style="color: red;">Error: ${result.error}</p>`;
+        }
+      } catch (error) {
+        output.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+      }
+    }
+
+    async function checkAuth() {
+      const output = document.getElementById('auth-output');
+      
+      try {
+        const result = await auth.getCurrentUser();
+        if (result.success && result.user) {
+          output.innerHTML = `<p style="color: green;">Logged in as: ${result.user.username || result.user.email || 'User'}</p>`;
+        } else {
+          output.innerHTML = '<p>Not logged in</p>';
+        }
+      } catch (error) {
+        output.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+      }
+    }
+
+    // Initialize when page loads
+    window.addEventListener('load', initializePuter);
+
+    // Add Enter key support for AI input
+    document.addEventListener('DOMContentLoaded', () => {
+      const aiInput = document.getElementById('ai-input');
+      if (aiInput) {
+        aiInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            askAI();
+          }
+        });
+      }
+    });
+  </script>
+
+  <!-- Include the class definitions -->
+  <script>${AI_CHAT_TEMPLATE}</script>
+  <script>${FILE_SYSTEM_TEMPLATE}</script>
+  <script>${AUTH_TEMPLATE}</script>
+
+  <style>
+    body { font-family: system-ui; margin: 2rem; }
+    #app { opacity: 0.5; transition: opacity 0.3s; }
+    div[id$="-section"] { margin: 2rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; }
+    input { padding: 0.5rem; margin: 0.5rem; width: 300px; }
+    button { padding: 0.5rem 1rem; margin: 0.5rem; cursor: pointer; }
+    #ai-response, #file-output, #auth-output { 
+      margin: 1rem 0; 
+      padding: 1rem; 
+      background: #f5f5f5; 
+      border-radius: 4px; 
+      min-height: 2rem;
+    }
+  </style>
+</body>
+</html>
