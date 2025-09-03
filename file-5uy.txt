@@ -1,0 +1,233 @@
+package com.yourapp.securestorage
+
+import android.content.Context
+import android.os.FileObserver
+import android.util.Log
+import androidx.documentfile.provider.DocumentFile
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.nio.file.attribute.PosixFilePermission
+import java.nio.file.attribute.PosixFilePermissions
+import java.util.EnumSet
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.DocumentsContract
+import java.io.InputStream
+import java.io.OutputStream
+import java.lang.Runtime.getRuntime
+
+class SecureStorageManager(private val context: Context) {
+
+    companion object {
+        private const val TAG = "SecureStorageManager"
+        private const val SECURE_BASE_DIR = "secure_data"
+        private const val DATASETS_DIR = "datasets"
+        private const val CONFIGS_DIR = "configs"
+        private const val LOGS_DIR = "logs"
+
+        // POSIX for rw-r--r-- (644)
+        private val RW_R_R_PERMS = EnumSet.of(
+            PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
+            PosixFilePermission.GROUP_READ, PosixFilePermission.OTHERS_READ
+        )
+
+        // For rooted chmod
+        private fun isRooted(): Boolean {
+            return try {
+                getRuntime().exec("su").outputStream.close()
+                true
+            } catch (e: Exception) {
+                false
+            }
+        }
+    }
+
+    private val internalBaseDir = File(context.filesDir, SECURE_BASE_DIR)
+    private var externalTreeUri: Uri? = null // Persisted SAF URI for external/emulated/0
+    private val observers = mutableListOf<FileObserver>()
+
+    // Create secure directory structure in internal storage
+    fun createSecureDirectories() {
+        createAndSecureDir(internalBaseDir)
+        createAndSecureDir(File(internalBaseDir, DATASETS_DIR))
+        createAndSecureDir(File(internalBaseDir, CONFIGS_DIR))
+        createAndSecureDir(File(internalBaseDir, LOGS_DIR))
+
+        // Start monitoring
+        setupMonitors()
+    }
+
+    private fun createAndSecureDir(dir: File) {
+        if (!dir.exists()) {
+            dir.mkdirs()
+            Log.d(TAG, "Created dir: ${dir.absolutePath}")
+        }
+        setSecurePermissions(dir.toPath())
+    }
+
+    private fun setSecurePermissions(path: Path) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Files.setPosixFilePermissions(path, RW_R_R_PERMS)
+                Log.d(TAG, "Set POSIX permissions on ${path.toString()}")
+            } else {
+                // Fallback for older API - use File APIs
+                val file = path.toFile()
+                file.setReadable(true, true) // r for all
+                file.setWritable(true, true) // w for owner/group
+                file.setExecutable(false, false) // No exec
+                Log.d(TAG, "Set basic permissions on ${file.absolutePath}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Permission set failed: ${e.message}")
+            if (isRooted()) {
+                rootChmod(path.toString(), "644")
+            }
+        }
+    }
+
+    private fun rootChmod(filePath: String, mode: String) {
+        try {
+            getRuntime().exec(arrayOf("su", "-c", "chmod $mode $filePath"))
+            Log.d(TAG, "Root chmod $mode on $filePath")
+        } catch (e: Exception) {
+            Log.e(TAG, "Root chmod failed: ${e.message}")
+        }
+    }
+
+    // Setup FileObserver to monitor for changes and restore if tampered
+    private fun setupMonitors() {
+        val dirsToMonitor = listOf(internalBaseDir, File(internalBaseDir, DATASETS_DIR))
+        dirsToMonitor.forEach { dir ->
+            val observer = object : FileObserver(dir, ALL_EVENTS) {
+                override fun onEvent(event: Int, path: String?) {
+                    val fullPath = path?.let { File(dir, it) } ?: dir
+                    if (isSymlink(fullPath)) {
+                        fullPath.delete()
+                        Log.e(TAG, "Symlink attack detected and removed: $fullPath")
+                        return
+                    }
+                    when (event) {
+                        MODIFY, DELETE -> {
+                            Log.w(TAG, "Tamper detected on $fullPath - restoring permissions")
+                            setSecurePermissions(fullPath.toPath())
+                            // Restore from backup if needed (implement backup logic)
+                        }
+                    }
+                }
+            }
+            observers.add(observer)
+            observer.startWatching()
+            Log.d(TAG, "Monitoring started on ${dir.absolutePath}")
+        }
+    }
+
+    fun stopMonitors() {
+        observers.forEach { it.stopWatching() }
+        observers.clear()
+    }
+
+    // Detect symlink
+    fun isSymlink(file: File): Boolean {
+        return !file.absolutePath.equals(file.canonicalPath)
+    }
+
+    // Prevent poison pill/rogue scripts: Validate file before execute/load
+    fun validateFile(file: File): Boolean {
+        if (!file.exists() || isSymlink(file) || file.length() == 0) { // Basic poison pill check
+            Log.e(TAG, "Invalid file: $file - potential poison pill or rogue")
+            return false
+        }
+        // Additional checks: Hash validation or signature if needed
+        return true
+    }
+
+    // Mimic scoped storage for external/emulated/0 using SAF
+    fun requestExternalAccess(onSuccess: (Uri) -> Unit) {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+        intent.flags = Intent.FLAG_GRANT_READ_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+        context.startActivityForResult(intent, REQUEST_CODE_SAF)
+        // In Activity onActivityResult:
+        // if (resultCode == Activity.RESULT_OK && data != null) {
+        //     val uri = data.data
+        //     context.contentResolver.takePersistableUriPermission(uri!!, Intent.FLAG_GRANT_READ_WRITE_URI_PERMISSION)
+        //     externalTreeUri = uri
+        //     onSuccess(uri)
+        // }
+    }
+
+    fun writeToExternal(fileName: String, content: ByteArray) {
+        externalTreeUri?.let { treeUri ->
+            val treeDoc = DocumentFile.fromTreeUri(context, treeUri)
+            val fileDoc = treeDoc?.createFile("application/octet-stream", fileName)
+            fileDoc?.uri?.let { uri ->
+                context.contentResolver.openOutputStream(uri).use { os: OutputStream? ->
+                    os?.write(content)
+                }
+                Log.d(TAG, "Wrote to external: $fileName")
+            }
+        }
+    }
+
+    fun readFromExternal(fileName: String): ByteArray? {
+        externalTreeUri?.let { treeUri ->
+            val treeDoc = DocumentFile.fromTreeUri(context, treeUri)
+            val fileDoc = treeDoc?.findFile(fileName)
+            fileDoc?.uri?.let { uri ->
+                context.contentResolver.openInputStream(uri).use { input: InputStream? ->
+                    return input?.readBytes()
+                }
+            }
+        }
+        return null
+    }
+
+    // For rooted, seal external/emulated/0 with chmod
+    fun sealExternalRooted() {
+        if (isRooted()) {
+            rootChmod(Environment.getExternalStorageDirectory().absolutePath, "700") // rwx owner only
+            Log.d(TAG, "Sealed external/emulated/0 with root chmod 700")
+        }
+        }
+
+    // Utility to check root
+    private fun isRooted(): Boolean {
+        return try {
+            getRuntime().exec("su").outputStream.close()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+}
+
+// Usage in your app (e.g., MainActivity)
+class MainActivity : AppCompatActivity() {
+    private lateinit var secureManager: SecureStorageManager
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        secureManager = SecureStorageManager(this)
+        secureManager.createSecureDirectories()
+        secureManager.requestExternalAccess { uri ->
+            // Save externalTreeUri in prefs
+            // Use writeToExternal/readFromExternal for scoped access
+        }
+        // If rooted, secureManager.sealExternalRooted()
+
+        // Example write secure file
+        val datasetsDir = File(secureManager.internalBaseDir, DATASETS_DIR)
+        val secureFile = File(datasetsDir, "sensitive_data.txt")
+        secureFile.writeBytes("Protected data".toByteArray(Charsets.UTF_8))
+        secureManager.setSecurePermissions(secureFile.toPath())
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        secureManager.stopMonitors()
+    }
+}
