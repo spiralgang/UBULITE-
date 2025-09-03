@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""
+BigModel/Zhipu AI Integration Script
+Handles intelligent routing between BigModel (full reasoning) and Zhipu (coding-focused) models.
+"""
+
+import os
+import sys
+import json
+import time
+import hashlib
+import requests
+
+# Configuration
+BIGMODEL_MODEL = os.getenv("BIGMODEL_MODEL", "glm-4")            # full reasoning, 4.0 tier
+ZHIPU_MODEL   = os.getenv("ZHIPU_MODEL",   "glm-4-9b-code")      # mini/coding 4.0S
+BIGMODEL_KEY  = os.getenv("BIGMODEL")                            # API key secret name: BIGMODEL
+ZHIPU_KEY     = os.getenv("ZHIPU")                                # API key secret name: ZHIPU
+ENDPOINT      = os.getenv("BIGMODEL_ENDPOINT", "https://open.bigmodel.cn/api/paas/v4/chat/completions")
+
+# Budgets
+MAX_TOKENS_PER_CALL = int(os.getenv("MAX_TOKENS_PER_CALL", "1200"))
+MAX_DAILY_CALLS     = int(os.getenv("MAX_DAILY_CALLS", "500"))
+ROUTE_THRESHOLD_CHARS = int(os.getenv("ROUTE_THRESHOLD_CHARS", "8000"))  # escalate if input is long
+
+# Simple day-bucket counter (workspace-relative)
+STATE_DIR = os.getenv("STATE_DIR", ".glm-companion/workspace")
+os.makedirs(STATE_DIR, exist_ok=True)
+COUNTER_PATH = f"{STATE_DIR}/usage-{time.strftime('%Y-%m-%d')}.json"
+CACHE_PATH   = f"{STATE_DIR}/cache.json"
+
+def load_json(p, default):
+    try:
+        with open(p, "r") as f:
+            return json.load(f)
+    except:
+        return default
+
+def save_json(p, data):
+    tmp = p + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, p)
+
+usage = load_json(COUNTER_PATH, {"calls": 0})
+cache = load_json(CACHE_PATH, {})
+
+def cache_key(model, messages, temperature):
+    blob = json.dumps({"m": model, "t": temperature, "msgs": messages}, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+def pick_model(task_type, messages):
+    # Default to mini/coding. Escalate if:
+    # - task explicitly deep, or
+    # - content is long past threshold.
+    total_chars = sum(len(m.get("content","")) for m in messages if isinstance(m.get("content"), str))
+    if task_type in ("deep", "plan", "long") or total_chars > ROUTE_THRESHOLD_CHARS:
+        return ("BIGMODEL", BIGMODEL_MODEL, BIGMODEL_KEY)
+    # Prefer coding-tuned mini for code tasks
+    if task_type in ("code", "lint", "review"):
+        return ("ZHIPU", ZHIPU_MODEL, ZHIPU_KEY)
+    # Lightweight default
+    return ("ZHIPU", ZHIPU_MODEL, ZHIPU_KEY)
+
+def call_model(model, api_key, messages, temperature=0.2, max_tokens=MAX_TOKENS_PER_CALL):
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+    payload = {"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
+
+    r = requests.post(ENDPOINT, headers=headers, data=json.dumps(payload), timeout=60)
+    r.raise_for_status()
+    data = r.json()
+    # BigModel format: data.choices[0].message.content
+    return data["choices"][0]["message"]["content"], data
+
+def main():
+    # Expect a JSON stdin payload:
+    # { "task_type": "code|deep|review|chat", "messages": [...], "temperature": 0.2 }
+    spec = json.loads(sys.stdin.read())
+    task_type   = spec.get("task_type", "chat")
+    messages    = spec.get("messages", [])
+    temperature = float(spec.get("temperature", 0.2))
+
+    # Budget gate
+    if usage["calls"] >= MAX_DAILY_CALLS:
+        print(json.dumps({
+            "status": "budget_exceeded",
+            "reason": f"Daily call cap {MAX_DAILY_CALLS} reached",
+            "calls_today": usage["calls"]
+        }))
+        return
+
+    # Routing
+    which, model, key = pick_model(task_type, messages)
+    if not key:
+        print(json.dumps({"status": "error", "reason": f"Missing API key for route {which}"}))
+        return
+
+    # Cache
+    ck = cache_key(model, messages, temperature)
+    if ck in cache:
+        out = cache[ck]
+        out["status"] = "ok"
+        out["cached"] = True
+        print(json.dumps(out, ensure_ascii=False))
+        return
+
+    # Call
+    try:
+        content, raw = call_model(model, key, messages, temperature)
+    except requests.HTTPError as e:
+        print(json.dumps({"status": "error", "reason": f"HTTP {e.response.status_code}", "body": e.response.text}))
+        return
+    except Exception as e:
+        print(json.dumps({"status": "error", "reason": str(e)}))
+        return
+
+    # Record usage
+    usage["calls"] += 1
+    save_json(COUNTER_PATH, usage)
+
+    result = {
+        "status": "ok",
+        "route": which,
+        "model": model,
+        "temperature": temperature,
+        "calls_today": usage["calls"],
+        "content": content,
+    }
+    cache[ck] = result
+    save_json(CACHE_PATH, cache)
+    print(json.dumps(result, ensure_ascii=False))
+
+if __name__ == "__main__":
+    main()
