@@ -3,7 +3,7 @@
  * AI-powered development tools using puter.js
  */
 
-const { PuterClientManager, PuterErrorHandler } = require('../integration/puter-core-utils');
+const { PuterClientManager, PuterErrorHandler } = require('../integration/puter-core-utils.js');
 
 /**
  * AI Code Reviewer using Puter.js
