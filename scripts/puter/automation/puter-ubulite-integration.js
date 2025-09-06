@@ -3,7 +3,7 @@
  * Integrates UBULITE system features with puter.js capabilities
  */
 
-const { PuterClientManager } = require('../integration/puter-core-utils');
+const { PuterClientManager } = require('../integration/puter-core-utils.js');
 const { execSync } = require('child_process');
 
 /**
