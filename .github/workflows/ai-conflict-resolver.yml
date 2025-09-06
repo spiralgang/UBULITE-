@@ -1,6 +1,6 @@
----
-name: AI Conflict Resolver
+name: AI Conflict Resolver (Puter.js Powered)
 
+# Automated conflict detection and resolution using puter.js - NO Google dependencies!
 on:
   issues:
     types: [opened, edited, commented, labeled]
@@ -16,12 +16,11 @@ permissions:
   id-token: write
 
 env:
-  GEMINI_MODEL: "gemini-pro-2.5"
-  GEMINI_AUTH_MODE: ${{ secrets.GEMINI_AUTH_MODE || 'secret' }}
-  GEMINI_API_ENDPOINT: ${{ secrets.GEMINI_API_ENDPOINT }}
+  PUTER_CLIENT_ENABLED: true
+  FEAT_PUTER: true
 
 jobs:
-  conflict-resolution:
+  ai-conflict-resolver:
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -35,124 +34,34 @@ jobs:
         with:
           node-version: "18"
 
-      - name: Install GitHub CLI
+      - name: Install puter.js dependencies
         run: |
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt update
-          sudo apt install gh
+          npm install --no-package-lock
+          # Ensure node-fetch is available for puter integration
+          npm install node-fetch@2.7.0 --no-save
 
-      - name: (gcloud) Authenticate to GCP with Workload Identity (if requested)
-        if: env.GEMINI_AUTH_MODE == 'gcloud'
-        uses: google-github-actions/auth@v1
-        with:
-          workload_identity_provider: >-
-            ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
-
-      - name: (gcloud) Install gcloud SDK and obtain access token
-        if: env.GEMINI_AUTH_MODE == 'gcloud'
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_ID || '' }}
-        run: |
-          TOKEN=$(gcloud auth print-access-token)
-          if [ -z "$TOKEN" ]; then
-            echo "Failed to obtain access token from gcloud" >&2
-            exit 2
-          fi
-          echo "GEMINI_ACCESS_TOKEN=$TOKEN" >> $GITHUB_ENV
-
-      - name: Generate GitHub App installation token (if configured)
-        if: >-
-          ${{ secrets.GITHUB_APP_PRIVATE_KEY != '' &&
-              secrets.GITHUB_APP_ID != '' &&
-              secrets.GITHUB_APP_INSTALLATION_ID != '' }}
+      - name: Run Puter.js AI Conflict Resolution Analysis
+        id: puter_conflict_analysis
         env:
-          GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
-          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-          GITHUB_APP_INSTALLATION_ID: >-
-            ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
-        run: |
-          node ./scripts/get-github-app-token.js > /tmp/.gh_app_token || \
-            (echo "failed to obtain app token" >&2; exit 2)
-          echo "GITHUB_APP_INSTALLATION_TOKEN=$(cat /tmp/.gh_app_token)" \
-            >> $GITHUB_ENV
-          rm -f /tmp/.gh_app_token
-
-      - name: Detect conflicts and analyze issue context
-        id: conflict_detection
-        env:
+          PUTER_CLIENT_ENABLED: ${{ env.PUTER_CLIENT_ENABLED }}
+          FEAT_PUTER: ${{ env.FEAT_PUTER }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
-          # Extract issue/PR context
-          if [ "${{ github.event_name }}" = "issues" ]; then
-            ISSUE_NUMBER="${{ github.event.issue.number }}"
-            ISSUE_TITLE="${{ github.event.issue.title }}"
-            ISSUE_BODY="${{ github.event.issue.body }}"
-            CONTEXT_TYPE="issue"
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            ISSUE_NUMBER="${{ github.event.pull_request.number }}"
-            ISSUE_TITLE="${{ github.event.pull_request.title }}"
-            ISSUE_BODY="${{ github.event.pull_request.body }}"
-            CONTEXT_TYPE="pull_request"
-          elif [ "${{ github.event_name }}" = "issue_comment" ]; then
-            ISSUE_NUMBER="${{ github.event.issue.number }}"
-            ISSUE_TITLE="${{ github.event.issue.title }}"
-            ISSUE_BODY="${{ github.event.comment.body }}"
-            CONTEXT_TYPE="comment"
-          fi
+          echo "🚀 Starting Puter.js AI Conflict Resolution System v2.0"
+          echo "✅ Google/Gemini dependencies removed - using puter.js instead!"
+          
+          # Make script executable
+          chmod +x scripts/puter/conflict-resolution/puter-conflict-resolver.js
+          
+          # Run the puter.js-powered conflict resolver
+          node scripts/puter/conflict-resolution/puter-conflict-resolver.js
 
-          # Check for conflict indicators
-          CONFLICT_DETECTED="false"
-          if echo "$ISSUE_TITLE $ISSUE_BODY" | \
-             grep -iE "(conflict|disagreement|merge.*(issue|problem)|resolve.*conflict|ai.*conflict|workflow.*fail|build.*fail)"; then
-            CONFLICT_DETECTED="true"
-          fi
-
-          # Check for merge conflicts in PR
-          if [ "$CONTEXT_TYPE" = "pull_request" ]; then
-            git fetch origin main --depth=1 || true
-            if ! git merge-tree $(git merge-base HEAD origin/main) \
-                 HEAD origin/main | grep -q "<<<<<<< "; then
-              if git diff --name-only origin/main...HEAD | \
-                 xargs -I {} sh -c \
-                 'git show HEAD:{} >/dev/null 2>&1 || echo "CONFLICT_FILE: {}"' | \
-                 grep -q "CONFLICT_FILE:"; then
-                CONFLICT_DETECTED="true"
-              fi
-            fi
-          fi
-
-          echo "CONFLICT_DETECTED=$CONFLICT_DETECTED" >> $GITHUB_OUTPUT
-          echo "ISSUE_NUMBER=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
-          echo "CONTEXT_TYPE=$CONTEXT_TYPE" >> $GITHUB_OUTPUT
-          echo "ISSUE_TITLE=$ISSUE_TITLE" >> $GITHUB_OUTPUT
-
-      - name: Run AI conflict analysis and resolution
-        if: steps.conflict_detection.outputs.CONFLICT_DETECTED == 'true'
-        id: ai_resolution
-        env:
-          GEMINI_MODEL: ${{ env.GEMINI_MODEL }}
-          GEMINI_AUTH_MODE: ${{ env.GEMINI_AUTH_MODE }}
-          GEMINI_API_ENDPOINT: ${{ env.GEMINI_API_ENDPOINT }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI }}
-          GEMINI_ACCESS_TOKEN: ${{ env.GEMINI_ACCESS_TOKEN }}
-          GITHUB_APP_INSTALLATION_TOKEN: >-
-            ${{ env.GITHUB_APP_INSTALLATION_TOKEN || '' }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUMBER: ${{ steps.conflict_detection.outputs.ISSUE_NUMBER }}
-          CONTEXT_TYPE: ${{ steps.conflict_detection.outputs.CONTEXT_TYPE }}
-          ISSUE_TITLE: ${{ steps.conflict_detection.outputs.ISSUE_TITLE }}
-        run: |
-          node ./scripts/ai-conflict-resolver.js
-
-      - name: Upload conflict resolution artifact
-        if: >-
-          always() &&
-          steps.conflict_detection.outputs.CONFLICT_DETECTED == 'true'
+      - name: Upload puter.js conflict resolution artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: >-
-            conflict-resolution-output-${{ steps.conflict_detection.outputs.ISSUE_NUMBER }}
-          path: ./artifacts/conflict-resolution-*.json
+          name: puter-ai-conflict-resolution-${{ github.run_number }}
+          path: ./artifacts/puter-conflict-resolution-*.json
