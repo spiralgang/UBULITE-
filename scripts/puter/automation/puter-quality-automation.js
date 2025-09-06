@@ -3,7 +3,7 @@
  * Automated workflows and task management using puter.js
  */
 
-const { PuterClientManager } = require('../integration/puter-core-utils');
+const { PuterClientManager } = require('../integration/puter-core-utils.js');
 const { execSync } = require('child_process');
 const { writeFileSync, readFileSync, existsSync } = require('fs');
 
