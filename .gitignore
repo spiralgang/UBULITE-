@@ -33,3 +33,7 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# AI artifacts (keep real artifacts, exclude test ones)
+artifacts/*test*.json
+__pycache__/
